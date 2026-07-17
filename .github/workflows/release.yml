@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey:9
+        options: --health-cmd "valkey-cli ping" --health-interval 2s --health-retries 30
+        ports: [6379:6379]
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: rate_limit
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rate_limit"
+          --health-interval 2s
+          --health-retries 30
+        ports: [5432:5432]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make check
+        env:
+          POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/rate_limit?sslmode=disable
+          VALKEY_ADDRESS: 127.0.0.1:6379
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
