@@ -1,0 +1,878 @@
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit
+
+package ratelimit // import "github.com/faustbrian/golib/pkg/rate-limit"
+
+Package ratelimit defines transport-neutral admission policies, requests,
+decisions, observations, batching, and concurrency leases.
+
+The package performs no sleeping or retry orchestration. Backends implement
+atomic state changes, while Service applies the policy's explicit failure mode
+and emits bounded observations.
+
+CONSTANTS
+
+const (
+	// MaxSubjectBytes is the maximum unencoded subject length accepted by NewKey.
+	MaxSubjectBytes = 256
+)
+const (
+	// MaxPolicyIDBytes bounds persisted and observed policy identifiers.
+	MaxPolicyIDBytes = 64
+	// MaxPolicyRevisionBytes bounds persisted and observed revision identifiers.
+	MaxPolicyRevisionBytes = 64
+	// MaxConcurrencyLeases bounds active lease entries for one policy and key.
+	MaxConcurrencyLeases = 1024
+)
+const MaxBatchSize = 256
+    MaxBatchSize bounds memory, backend work, and observation fan-out per call.
+
+const MaxLeaseIDBytes = 128
+    MaxLeaseIDBytes bounds caller-generated concurrency lease identifiers.
+
+const MaxObservers = 16
+    MaxObservers bounds synchronous observation fan-out per decision.
+
+
+VARIABLES
+
+var (
+	// ErrRejected indicates a valid admission request exceeded its limit.
+	ErrRejected = errors.New("rate limit rejected")
+	// ErrInvalidPolicy indicates policy construction failed validation.
+	ErrInvalidPolicy = errors.New("invalid rate limit policy")
+	// ErrInvalidKey indicates key derivation received unsafe or oversized input.
+	ErrInvalidKey = errors.New("invalid rate limit key")
+	// ErrInvalidRequest indicates an admission or lease request is malformed.
+	ErrInvalidRequest = errors.New("invalid rate limit request")
+	// ErrUnavailable indicates the selected backend cannot currently decide.
+	ErrUnavailable = errors.New("rate limit backend unavailable")
+	// ErrDeadline indicates cancellation or deadline expiry interrupted a decision.
+	ErrDeadline = errors.New("rate limit deadline exceeded")
+	// ErrOverflow indicates bounded integer arithmetic could not represent a result.
+	ErrOverflow = errors.New("rate limit arithmetic overflow")
+	// ErrCorrupt indicates persisted state violates backend invariants.
+	ErrCorrupt = errors.New("rate limit state corrupt")
+	// ErrUnsupported indicates the backend cannot guarantee an operation's semantics.
+	ErrUnsupported = errors.New("rate limit operation unsupported")
+	// ErrLeaseNotFound indicates a concurrency lease does not exist or expired.
+	ErrLeaseNotFound = errors.New("rate limit lease not found")
+	// ErrLeaseNotOwned indicates a lease belongs to different policy or backend state.
+	ErrLeaseNotOwned = errors.New("rate limit lease not owned")
+)
+
+TYPES
+
+type Algorithm string
+    Algorithm identifies the admission algorithm used by a policy.
+
+const (
+	// TokenBucket refills capacity continuously using integer arithmetic.
+	TokenBucket Algorithm = "token_bucket"
+	// FixedWindow resets capacity at deterministic period boundaries.
+	FixedWindow Algorithm = "fixed_window"
+	// SlidingWindow estimates a rolling window using bounded segments.
+	SlidingWindow Algorithm = "sliding_window"
+	// Concurrency admits weighted work while an explicit lease is held.
+	Concurrency Algorithm = "concurrency"
+)
+type Atomicity string
+    Atomicity defines the guarantee requested for a batch.
+
+const (
+	// AtomicityPerItem evaluates each item independently and in input order.
+	AtomicityPerItem Atomicity = "per_item"
+	// AtomicityAllOrNothing requests a guarantee not provided by Service.Batch.
+	AtomicityAllOrNothing Atomicity = "all_or_nothing"
+)
+type Backend interface {
+	// Name returns a stable implementation identifier for decisions and leases.
+	Name() string
+	// Admit atomically consumes capacity or returns ErrRejected.
+	Admit(context.Context, Request) (Decision, error)
+}
+    Backend atomically evaluates admission requests within its documented scope.
+
+type BatchDecision struct {
+	// Decisions contains one result per input request.
+	Decisions []Decision
+	// Atomicity reports the guarantee applied to Decisions.
+	Atomicity Atomicity
+}
+    BatchDecision preserves input order and documents actual atomicity.
+
+type BatchRequest struct {
+	// Requests contains between one and MaxBatchSize attempts.
+	Requests []Request
+	// Atomicity must be AtomicityPerItem.
+	Atomicity Atomicity
+}
+    BatchRequest groups bounded admission attempts with explicit atomicity.
+
+type Consistency string
+    Consistency describes the scope in which a backend enforces a policy.
+
+const (
+	// ConsistencyProcessLocal limits independently inside one process.
+	ConsistencyProcessLocal Consistency = "process_local"
+	// ConsistencyStrong requires atomic coordination through shared state.
+	ConsistencyStrong Consistency = "strong"
+)
+type Decision struct {
+	// Allowed reports whether the operation may proceed.
+	Allowed bool
+	// Remaining is the immediately available whole-unit capacity.
+	Remaining uint64
+	// Limit is the configured Capacity plus Burst.
+	Limit uint64
+	// Reset is the earliest useful replenishment or lease expiry time.
+	Reset time.Time
+	// RetryAfter is the minimum suggested delay after rejection.
+	RetryAfter time.Duration
+	// Reason is a stable machine-readable classification.
+	Reason Reason
+	// Backend identifies the implementation that made the decision.
+	Backend string
+	// PolicyRevision identifies the admission semantics used.
+	PolicyRevision string
+}
+    Decision describes the complete, observable result of admission.
+
+type FailureMode uint8
+    FailureMode controls the decision returned when a backend cannot decide.
+
+const (
+	// FailClosed rejects admission when the backend is unavailable.
+	FailClosed FailureMode = iota
+	// FailOpen admits non-concurrency work when the backend is unavailable.
+	FailOpen
+)
+type Key struct {
+	// Has unexported fields.
+}
+    Key is a validated, bounded backend key with a safe subject kind.
+
+func NewKey(spec KeySpec) (Key, error)
+    NewKey validates and derives a namespaced key from spec.
+
+func (k Key) String() string
+    String returns the bounded persisted representation.
+
+func (k Key) SubjectKind() string
+    SubjectKind returns the safe, low-cardinality subject category.
+
+type KeySpec struct {
+	// Namespace isolates applications or package consumers.
+	Namespace string
+	// Version permits intentional key derivation changes.
+	Version string
+	// Subject supplies the typed identity.
+	Subject Subject
+	// Hash irreversibly hashes Subject.Value before storage and observation.
+	Hash bool
+}
+    KeySpec describes a namespaced and versioned admission key.
+
+type Lease struct {
+	// ID is the caller-generated lease identity.
+	ID string
+	// Key identifies the concurrency state.
+	Key Key
+	// PolicyID identifies the owning policy.
+	PolicyID string
+	// PolicyRevision identifies the semantics used when acquiring the lease.
+	PolicyRevision string
+	// Cost is the held concurrency weight.
+	Cost uint64
+	// ExpiresAt is the automatic release boundary.
+	ExpiresAt time.Time
+	// Backend identifies the implementation that created the lease.
+	Backend string
+}
+    Lease is proof of weighted concurrency ownership until ExpiresAt or release.
+
+type LeaseBackend interface {
+	// Acquire creates or idempotently returns a weighted lease.
+	Acquire(context.Context, LeaseRequest) (Lease, Decision, error)
+	// Release relinquishes an owned lease without affecting unrelated capacity.
+	Release(context.Context, Lease) error
+}
+    LeaseBackend provides atomic acquire and ownership-checked release.
+
+type LeaseRequest struct {
+	// Request must use a Concurrency policy.
+	Request Request
+	// LeaseID is an idempotent, caller-generated bounded identifier.
+	LeaseID string
+}
+    LeaseRequest requests weighted concurrency admission under a unique lease
+    ID.
+
+func (request LeaseRequest) Validate() error
+    Validate checks concurrency policy, admission inputs, and lease identity.
+
+type Observation struct {
+	// PolicyID is the stable policy identity and must not contain credentials.
+	PolicyID string
+	// SubjectKind is the bounded key category, never the raw subject value.
+	SubjectKind string
+	// Decision is the completed admission result.
+	Decision Decision
+	// Err is the stable error returned to the caller, if any.
+	Err error
+	// Duration is local service processing time.
+	Duration time.Duration
+}
+    Observation contains bounded decision metadata for logging and telemetry.
+
+type ObserveFunc func(Observation)
+    ObserveFunc adapts a function to Observer.
+
+func (function ObserveFunc) Observe(observation Observation)
+    Observe calls function with observation.
+
+type Observer interface {
+	Observe(Observation)
+}
+    Observer consumes bounded admission observations.
+
+type Policy struct {
+	// Has unexported fields.
+}
+    Policy is an immutable, validated admission policy.
+
+func NewPolicy(spec PolicySpec) (Policy, error)
+    NewPolicy validates spec and returns an immutable policy.
+
+func (p Policy) Algorithm() Algorithm
+    Algorithm returns the policy algorithm.
+
+func (p Policy) Burst() uint64
+    Burst returns additional bounded capacity.
+
+func (p Policy) Capacity() uint64
+    Capacity returns base capacity without burst.
+
+func (p Policy) Consistency() Consistency
+    Consistency returns the required coordination scope.
+
+func (p Policy) FailureMode() FailureMode
+    FailureMode returns the backend outage behavior.
+
+func (p Policy) ID() string
+    ID returns the stable policy identity.
+
+func (p Policy) LeaseDuration() time.Duration
+    LeaseDuration returns the concurrency lease duration.
+
+func (p Policy) Limit() uint64
+    Limit returns Capacity plus Burst.
+
+func (p Policy) MaxCost() uint64
+    MaxCost returns the greatest weight allowed for one operation.
+
+func (p Policy) Period() time.Duration
+    Period returns the refill or window duration.
+
+func (p Policy) Revision() string
+    Revision returns the immutable policy revision.
+
+type PolicySpec struct {
+	// ID is a stable, non-secret policy identifier.
+	ID string
+	// Revision changes whenever admission semantics change.
+	Revision string
+	// Algorithm selects the state transition model.
+	Algorithm Algorithm
+	// Capacity is the base number of units available per period or lease set.
+	Capacity uint64
+	// Period controls refill or window duration for non-concurrency policies.
+	Period time.Duration
+	// Burst adds bounded capacity above Capacity.
+	Burst uint64
+	// MaxCost bounds the weight of one request; zero defaults to Limit.
+	MaxCost uint64
+	// FailureMode controls backend outage behavior.
+	FailureMode FailureMode
+	// Consistency declares the required coordination scope.
+	Consistency Consistency
+	// Lease is the maximum concurrency lease duration.
+	Lease time.Duration
+}
+    PolicySpec contains the immutable inputs used to construct a Policy.
+
+type Reason string
+    Reason is a stable, non-sensitive classification of an admission decision.
+
+const (
+	// ReasonAllowed means capacity was consumed successfully.
+	ReasonAllowed Reason = "allowed"
+	// ReasonLimited means insufficient capacity was available.
+	ReasonLimited Reason = "limited"
+	// ReasonFailOpen means a backend failure was admitted by policy.
+	ReasonFailOpen Reason = "fail_open"
+	// ReasonBackendUnavailable means fail-closed policy rejected an outage.
+	ReasonBackendUnavailable Reason = "backend_unavailable"
+)
+type Request struct {
+	// Policy contains immutable admission semantics.
+	Policy Policy
+	// Key identifies the bounded subject state.
+	Key Key
+	// Cost is the positive number of units requested.
+	Cost uint64
+	// Now is the caller-supplied current time used by client-clock backends.
+	Now time.Time
+}
+    Request is a weighted admission attempt evaluated at an explicit time.
+
+func (r Request) Validate() error
+    Validate checks that all request inputs are present and bounded by Policy.
+
+type Service struct {
+	// Has unexported fields.
+}
+    Service validates requests, applies failure behavior, and emits
+    observations.
+
+func NewService(backend Backend, observers ...Observer) (*Service, error)
+    NewService constructs an admission service using backend and observers.
+
+func (service *Service) Acquire(ctx context.Context, request LeaseRequest) (lease Lease, decision Decision, err error)
+    Acquire validates and atomically obtains a concurrency lease.
+
+func (service *Service) Admit(ctx context.Context, request Request) (decision Decision, err error)
+    Admit evaluates one request without sleeping or retrying.
+
+func (service *Service) Batch(ctx context.Context, batch BatchRequest) (BatchDecision, error)
+    Batch evaluates a bounded list with per-item atomicity and no hidden
+    retries.
+
+func (service *Service) Release(ctx context.Context, lease Lease) error
+    Release relinquishes a lease through the backend that owns it.
+
+type Subject struct {
+	// Kind is a bounded, low-cardinality subject category.
+	Kind string
+	// Value is the identity value and should normally be irreversibly hashed.
+	Value string
+}
+    Subject is a typed identity input used only to derive a bounded Key.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/memory
+
+package memory // import "github.com/faustbrian/golib/pkg/rate-limit/memory"
+
+Package memory provides bounded, sharded, process-local admission state.
+
+CONSTANTS
+
+const (
+
+	// MaxConfiguredKeys bounds retained process-local state.
+	MaxConfiguredKeys = 1_000_000
+	// MaxConfiguredShards bounds eager lock and map allocation.
+	MaxConfiguredShards = 1024
+)
+
+TYPES
+
+type Options struct {
+	// MaxKeys is the hard cardinality bound across all shards.
+	MaxKeys int
+	// Shards controls lock striping and must not exceed MaxKeys.
+	Shards int
+}
+    Options configures bounded process-local storage.
+
+type Store struct {
+	// Has unexported fields.
+}
+    Store is a bounded, concurrency-safe, process-local backend.
+
+func New(options Options) (*Store, error)
+    New validates options and constructs an empty Store.
+
+func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
+    Acquire atomically obtains a weighted process-local concurrency lease.
+
+func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
+    Admit atomically evaluates one non-concurrency request in process.
+
+func (store *Store) Close() error
+    Close makes future operations return ratelimit.ErrUnavailable.
+
+func (store *Store) Len() int
+    Len returns the current number of keys across all shards.
+
+func (store *Store) Name() string
+    Name returns the stable backend identifier.
+
+func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
+    Release relinquishes a lease after verifying its ownership fields.
+
+func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error)
+    Sweep removes idle keys and expired leases, returning the keys removed.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/postgres
+
+package postgres // import "github.com/faustbrian/golib/pkg/rate-limit/postgres"
+
+Package postgres provides transactional admission backed by PostgreSQL and
+pgx. It is intended for coordination-heavy workloads, not as the default
+high-throughput backend.
+
+CONSTANTS
+
+const (
+	// MaxCleanupBatch bounds rows locked and returned by one cleanup statement.
+	MaxCleanupBatch = 10_000
+)
+
+FUNCTIONS
+
+func GoMigration() (migrations.Migration, error)
+    GoMigration adapts SchemaMigration to migrations.
+
+
+TYPES
+
+type ClockPolicy uint8
+    ClockPolicy selects the authoritative time source for transactions.
+
+const (
+	// ClientClock uses Request.Now and clamps rollback per key.
+	ClientClock ClockPolicy = iota
+	// ServerClock uses PostgreSQL clock_timestamp in the locked transaction.
+	ServerClock
+)
+type Migration struct {
+	// Version is the migrations version.
+	Version uint
+	// Name is the stable migration name.
+	Name string
+	// Up creates indexed rate-limit state storage.
+	Up string
+	// Down removes package-owned state storage.
+	Down string
+}
+    Migration is the portable SQL definition owned by this package.
+
+func SchemaMigration() Migration
+    SchemaMigration returns the package-owned PostgreSQL schema migration.
+
+type Options struct {
+	// Timeout bounds each backend operation.
+	Timeout time.Duration
+	// LockTimeout bounds PostgreSQL lock acquisition; zero uses Timeout.
+	LockTimeout time.Duration
+	// Clock selects client or PostgreSQL server time.
+	Clock ClockPolicy
+}
+    Options configures transaction deadlines, lock waits, and clock authority.
+
+type Store struct {
+	// Has unexported fields.
+}
+    Store is an atomic pgx-backed admission backend.
+
+func New(pool *pgxpool.Pool, options Options) (*Store, error)
+    New constructs a Store without checking whether its migration is installed.
+
+func Open(ctx context.Context, pool *pgxpool.Pool, options Options) (*Store, error)
+    Open constructs a Store and verifies the package-owned table exists.
+
+func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
+    Acquire transactionally obtains a weighted distributed concurrency lease.
+
+func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
+    Admit evaluates one non-concurrency request in a locked transaction.
+
+func (store *Store) Check(ctx context.Context) error
+    Check verifies that the package-owned schema migration is installed.
+
+func (store *Store) Cleanup(ctx context.Context, batch int) (int64, error)
+    Cleanup deletes at most batch expired states using SKIP LOCKED.
+
+func (store *Store) Name() string
+    Name returns the stable backend identifier.
+
+func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
+    Release transactionally verifies and relinquishes an owned lease.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimithttp
+
+package ratelimithttp // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimithttp"
+
+Package ratelimithttp provides net/http inbound admission middleware and strict
+trusted-proxy client IP extraction.
+
+CONSTANTS
+
+const (
+
+	// MaxTrustedProxies bounds configuration search and allocation.
+	MaxTrustedProxies = 64
+)
+
+VARIABLES
+
+var ErrInvalidClientIP = errors.New("invalid client IP")
+    ErrInvalidClientIP indicates an unsafe peer address or forwarded chain.
+
+
+TYPES
+
+type ClientIPExtractor struct {
+	// Has unexported fields.
+}
+    ClientIPExtractor derives a client address from a strictly trusted chain.
+
+func NewClientIPExtractor(options ClientIPOptions) (*ClientIPExtractor, error)
+    NewClientIPExtractor validates and copies trusted proxy prefixes.
+
+func (extractor *ClientIPExtractor) ClientIP(request *http.Request) (netip.Addr, error)
+    ClientIP returns the rightmost untrusted address, or the direct peer.
+
+type ClientIPOptions struct {
+	// TrustedProxies contains explicit masked network prefixes.
+	TrustedProxies []netip.Prefix
+}
+    ClientIPOptions defines the only peers trusted to supply X-Forwarded-For.
+
+type Middleware func(http.Handler) http.Handler
+    Middleware wraps an HTTP handler with inbound admission.
+
+func New(options Options) (Middleware, error)
+    New validates options and returns HTTP admission middleware.
+
+type Options struct {
+	// Service makes admission decisions.
+	Service *ratelimit.Service
+	// Policy applies to each request.
+	Policy ratelimit.Policy
+	// Now supplies explicit UTC time; nil uses time.Now.
+	Now func() time.Time
+	// Cost derives bounded request weight; nil returns one.
+	Cost func(*http.Request) (uint64, error)
+	// Key derives a bounded subject key; nil uses the hashed client IP.
+	Key func(*http.Request) (ratelimit.Key, error)
+	// ClientIP configures trusted proxies for the default Key function.
+	ClientIP ClientIPOptions
+}
+    Options configures inbound HTTP admission.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitlog
+
+package ratelimitlog // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitlog"
+
+Package ratelimitlog adapts bounded observations to structured slog records.
+
+TYPES
+
+type Observer struct {
+	// Has unexported fields.
+}
+    Observer records bounded admission observations with slog.
+
+func New(options Options) (*Observer, error)
+    New validates options and constructs an Observer.
+
+func (observer *Observer) Observe(observation ratelimit.Observation)
+    Observe writes one structured decision record.
+
+type Options struct {
+	// Logger receives bounded fields and no raw subject values.
+	Logger *slog.Logger
+	// Level controls the level of each decision record.
+	Level slog.Level
+}
+    Options configures structured observation logging.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitprincipal
+
+package ratelimitprincipal // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitprincipal"
+
+Package ratelimitprincipal adapts authentication principals to hashed admission
+keys without depending on a concrete authentication package.
+
+FUNCTIONS
+
+func Key(principal Principal) (ratelimit.Key, error)
+    Key derives a bounded, irreversibly hashed key from principal.
+
+
+TYPES
+
+type Principal interface {
+	// Subject returns the stable authenticated subject identifier.
+	Subject() string
+}
+    Principal is the narrow identity contract required for key derivation.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitqueue
+
+package ratelimitqueue // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitqueue"
+
+Package ratelimitqueue provides queue admission middleware that returns a typed
+deferral without acknowledging, sleeping, or changing retry ownership.
+
+TYPES
+
+type Deferred struct {
+	// RetryAfter is the backend decision's minimum suggested delay.
+	RetryAfter time.Duration
+	// Has unexported fields.
+}
+    Deferred indicates the durable queue should retry after RetryAfter.
+
+func (deferred *Deferred) Error() string
+    Error returns a stable message that does not disclose policy internals.
+
+func (deferred *Deferred) Unwrap() error
+    Unwrap returns ratelimit.ErrRejected.
+
+type Handler interface {
+	// Handle processes message without changing acknowledgement ownership.
+	Handle(context.Context, Message) error
+}
+    Handler processes an admitted queue message.
+
+type HandlerFunc func(context.Context, Message) error
+    HandlerFunc adapts a function to Handler.
+
+func (function HandlerFunc) Handle(ctx context.Context, message Message) error
+    Handle calls function with ctx and message.
+
+type Message struct {
+	// ID identifies the durable message.
+	ID string
+	// Queue identifies the source queue.
+	Queue string
+	// Tenant is an optional tenant identity.
+	Tenant string
+	// Principal is an optional authenticated principal identity.
+	Principal string
+	// Attempt reports the durable system's current delivery attempt.
+	Attempt uint64
+}
+    Message contains bounded queue admission inputs, not a durable payload.
+
+type Middleware func(Handler) Handler
+    Middleware wraps a Handler with admission that preserves durable semantics.
+
+func New(options Options) (Middleware, error)
+    New validates options and returns queue admission middleware.
+
+type Options struct {
+	// Service makes admission decisions.
+	Service *ratelimit.Service
+	// Policy contains immutable admission semantics.
+	Policy ratelimit.Policy
+	// Subject derives queue, tenant, principal, or custom identity.
+	Subject SubjectFunc
+	// Cost derives message weight; nil returns one.
+	Cost func(Message) (uint64, error)
+	// Now supplies explicit UTC time; nil uses time.Now.
+	Now func() time.Time
+}
+    Options configures queue admission.
+
+type SubjectFunc func(Message) (ratelimit.Subject, error)
+    SubjectFunc derives a typed subject from queue metadata.
+
+func ByPrincipal() SubjectFunc
+    ByPrincipal derives a required principal subject.
+
+func ByQueueAndTenant() SubjectFunc
+    ByQueueAndTenant derives an unambiguous composite subject.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitrpc
+
+package ratelimitrpc // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitrpc"
+
+Package ratelimitrpc provides transport-neutral JSON-RPC admission middleware
+for global, principal, method, tenant, and custom subjects.
+
+CONSTANTS
+
+const (
+	// CodeRateLimited is returned when a rule rejects admission.
+	CodeRateLimited = -32029
+	// CodeRateUnavailable is returned when a rule cannot decide safely.
+	CodeRateUnavailable = -32030
+	// MaxRules bounds work and state fan-out for one call.
+	MaxRules = 16
+)
+
+TYPES
+
+type Call struct {
+	// ID is copied to the response without interpretation.
+	ID any
+	// Method is the requested JSON-RPC method.
+	Method string
+	// Principal is an optional authenticated principal identity.
+	Principal string
+	// Tenant is an optional tenant identity.
+	Tenant string
+}
+    Call contains bounded JSON-RPC admission inputs.
+
+type Error struct {
+	// Code is CodeRateLimited or CodeRateUnavailable.
+	Code int
+	// Message omits policy and identity internals.
+	Message string
+	// RetryAfter is populated only for capacity rejection.
+	RetryAfter time.Duration
+}
+    Error is a transport-safe JSON-RPC admission error.
+
+type Handler interface {
+	// Handle processes call and returns its response.
+	Handle(context.Context, Call) (Response, error)
+}
+    Handler processes an admitted JSON-RPC call.
+
+type HandlerFunc func(context.Context, Call) (Response, error)
+    HandlerFunc adapts a function to Handler.
+
+func (function HandlerFunc) Handle(ctx context.Context, call Call) (Response, error)
+    Handle calls function with ctx and call.
+
+type Middleware func(Handler) Handler
+    Middleware wraps a JSON-RPC Handler with ordered admission rules.
+
+func New(options Options) (Middleware, error)
+    New validates and copies options before constructing middleware.
+
+type Options struct {
+	// Service makes admission decisions.
+	Service *ratelimit.Service
+	// Rules run in order and are bounded by MaxRules.
+	Rules []Rule
+	// Now supplies explicit UTC time; nil uses time.Now.
+	Now func() time.Time
+}
+    Options configures ordered JSON-RPC admission rules.
+
+type Response struct {
+	// ID corresponds to Call.ID.
+	ID any
+	// Result is the application result.
+	Result any
+	// Error is non-nil when admission or handling failed at protocol level.
+	Error *Error
+}
+    Response contains a JSON-RPC result or admission error.
+
+type Rule struct {
+	// Policy contains immutable admission semantics.
+	Policy ratelimit.Policy
+	// Subject derives global, principal, method, tenant, or custom identity.
+	Subject SubjectFunc
+	// Cost derives operation weight; nil returns one.
+	Cost func(Call) (uint64, error)
+}
+    Rule applies one policy to one derived subject and weighted cost.
+
+type SubjectFunc func(Call) (ratelimit.Subject, error)
+    SubjectFunc derives a typed subject without creating a persisted key.
+
+func Global(value string) SubjectFunc
+    Global returns a subject function using a required shared identity.
+
+func Method() SubjectFunc
+    Method returns a subject function using Call.Method.
+
+func Principal() SubjectFunc
+    Principal returns a subject function using Call.Principal.
+
+func Tenant() SubjectFunc
+    Tenant returns a subject function using Call.Tenant.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimittelemetry
+
+package ratelimittelemetry // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimittelemetry"
+
+Package ratelimittelemetry adapts bounded observations to OpenTelemetry metrics
+without using attacker-controlled values as unbounded labels.
+
+TYPES
+
+type Observer struct {
+	// Has unexported fields.
+}
+    Observer records bounded decision counts and latency.
+
+func New(options Options) (*Observer, error)
+    New constructs metric instruments using MeterProvider.
+
+func (observer *Observer) Observe(observation ratelimit.Observation)
+    Observe records one bounded decision and its duration.
+
+type Options struct {
+	// MeterProvider owns the created counter and latency histogram.
+	MeterProvider metric.MeterProvider
+}
+    Options configures OpenTelemetry metric instruments.
+
+PACKAGE github.com/faustbrian/golib/pkg/rate-limit/valkey
+
+package valkey // import "github.com/faustbrian/golib/pkg/rate-limit/valkey"
+
+Package valkey provides atomic distributed admission backed by native Valkey.
+Keys use one opaque hash tag, scripts are versioned, and state has bounded TTL.
+
+CONSTANTS
+
+const MaxPrefixBytes = 64
+    MaxPrefixBytes bounds the operator-controlled portion of persisted keys.
+
+
+TYPES
+
+type ClockPolicy uint8
+    ClockPolicy selects the authoritative time source for state transitions.
+
+const (
+	// ClientClock uses Request.Now and clamps rollback per key.
+	ClientClock ClockPolicy = iota
+	// ServerClock uses Valkey's TIME result inside the atomic script.
+	ServerClock
+)
+type Options struct {
+	// Prefix namespaces keys and must contain no spaces or hash-tag characters.
+	Prefix string
+	// Timeout bounds each server-side operation.
+	Timeout time.Duration
+	// Clock selects client or server time.
+	Clock ClockPolicy
+}
+    Options configures Valkey key names, deadlines, and clock authority.
+
+type Store struct {
+	// Has unexported fields.
+}
+    Store is an atomic native-Valkey admission backend.
+
+func New(client valkeygo.Client, options Options) (*Store, error)
+    New constructs a Store without performing network startup checks.
+
+func Open(ctx context.Context, client valkeygo.Client, options Options) (*Store, error)
+    Open constructs a Store and verifies Valkey version and eviction policy.
+
+func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
+    Acquire atomically obtains a weighted distributed concurrency lease.
+
+func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
+    Admit evaluates one non-concurrency request in an atomic Lua script.
+
+func (store *Store) Check(ctx context.Context) error
+    Check requires Valkey 9 or newer and a noeviction memory policy.
+
+func (store *Store) Name() string
+    Name returns the stable backend identifier.
+
+func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
+    Release atomically verifies and relinquishes an owned lease.
