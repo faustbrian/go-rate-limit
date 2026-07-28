@@ -7,6 +7,9 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Require owned sibling modules at local `v0.0.0`; clean external consumers
+  pin each module to an exact main pseudo-version.
+
 - Clarify that applications may use distributed concurrency leases around
   complete outbound provider operations while `http-client` continues to own
   request pacing, retries, and transport policy.
