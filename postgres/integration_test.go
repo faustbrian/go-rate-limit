@@ -23,7 +23,7 @@ func TestPostgreSQLAdmissionLeaseAndCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(pool.Close)
+	t.Cleanup(func() { closePoolWithin(t, pool) })
 	migration := postgres.SchemaMigration()
 	_, _ = pool.Exec(ctx, migration.Down)
 	if _, err := pool.Exec(ctx, migration.Up); err != nil {
@@ -66,7 +66,7 @@ func TestPostgreSQLAdmissionLeaseAndCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(reconnectPool.Close)
+	t.Cleanup(func() { closePoolWithin(t, reconnectPool) })
 	reconnectStore, err := postgres.New(reconnectPool, postgres.Options{
 		Timeout: time.Second, LockTimeout: 250 * time.Millisecond,
 		Clock: postgres.ClientClock,
@@ -115,6 +115,20 @@ func TestPostgreSQLAdmissionLeaseAndCleanup(t *testing.T) {
 		}
 		return ratelimittest.BackendFixture{Backend: conformance, Leases: conformance}
 	})
+}
+
+func closePoolWithin(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		pool.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("PostgreSQL pool cleanup exceeded one second")
+	}
 }
 
 func postgresIntegrationRequest(t *testing.T, algorithm ratelimit.Algorithm, id string, capacity uint64, period time.Duration) ratelimit.Request {
