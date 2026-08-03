@@ -142,21 +142,9 @@ exact production coverage, race tests, fuzz targets, documentation and API
 checks, vulnerability scanning, workflow validation, live integration tests,
 blocking benchmarks, and mutation testing.
 
-The mutation gate requires 100% mutation coverage for admission decisions and
-package-specific efficacy floors. The July 17 complete run reported:
-
-| Package | Killed | Lived | Uncovered | Timed out | Efficacy | Coverage |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| root admission boundaries | 119 | 0 | 0 | 1 | 100.00% | 100.00% |
-| memory | 80 | 26 | 0 | 5 | 75.47% | 100.00% |
-| postgres | 164 | 9 | 9 | 6 | 94.80% | 95.05% |
-| ratelimithttp | 23 | 7 | 0 | 0 | 76.67% | 100.00% |
-| ratelimitlog | 1 | 0 | 1 | 0 | 100.00% | 50.00% |
-| ratelimitprincipal | 2 | 0 | 0 | 0 | 100.00% | 100.00% |
-| ratelimitqueue | 15 | 0 | 0 | 0 | 100.00% | 100.00% |
-| ratelimitrpc | 12 | 1 | 4 | 0 | 92.31% | 76.47% |
-| ratelimittelemetry | 3 | 0 | 0 | 0 | 100.00% | 100.00% |
-| valkey | 61 | 3 | 0 | 0 | 95.31% | 100.00% |
+The canonical mutation gate requires exact 100% efficacy and mutant coverage
+for every viable production mutant. Package-specific floors and accepted
+timeouts are no longer release policy.
 
 A fresh complete report is required from `make check` for each release
 candidate; saved partial output is not release evidence.

@@ -4,7 +4,6 @@ GOLANGCI_LINT_VERSION := v2.12.2
 STATICCHECK_VERSION := v0.7.0
 NILAWAY_VERSION := v0.0.0-20260710181136-2378218750e4
 GOVULNCHECK_VERSION := v1.6.0
-GREMLINS_VERSION := v0.6.0
 ACTIONLINT_VERSION := v1.7.12
 
 .DEFAULT_GOAL := check
@@ -66,7 +65,7 @@ workflow:
 	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 mutation:
-	GREMLINS_VERSION=$(GREMLINS_VERSION) ./scripts/check-mutation.sh
+	./scripts/check-mutation.sh
 
 docs:
 	./scripts/check-docs.sh

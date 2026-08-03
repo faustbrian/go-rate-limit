@@ -7,6 +7,8 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Replace package-specific mutation floors and accepted timeouts with the
+  canonical exact-100 repository runner.
 - Require owned sibling modules at local `v0.0.0`; clean external consumers
   pin each module to an exact main pseudo-version.
 
