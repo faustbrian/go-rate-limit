@@ -60,7 +60,10 @@ func NewKey(spec KeySpec) (Key, error) {
 }
 
 func validKeyPart(value string) bool {
-	if value == "" || len(value) > maxKeyPartBytes {
+	if value == "" {
+		return false
+	}
+	if len(value) > maxKeyPartBytes {
 		return false
 	}
 	for _, char := range value {

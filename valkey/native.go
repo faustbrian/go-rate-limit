@@ -44,8 +44,15 @@ func New(client valkeygo.Client, options Options) (*Store, error) {
 // Open constructs a Store and verifies Valkey version and eviction policy.
 func Open(ctx context.Context, client valkeygo.Client, options Options) (*Store, error) {
 	store, err := New(client, options)
+	return openChecked(ctx, store, err)
+}
+
+func openChecked(ctx context.Context, store *Store, err error) (*Store, error) {
 	if err != nil {
 		return nil, err
+	}
+	if store == nil {
+		return nil, fmt.Errorf("%w: constructed store is missing", ratelimit.ErrInvalidPolicy)
 	}
 	if err := store.Check(ctx); err != nil {
 		return nil, err
@@ -93,16 +100,37 @@ func (executor *nativeExecutor) release(ctx context.Context, keys, args []string
 }
 
 func executeScript(ctx context.Context, client valkeygo.Client, script *valkeygo.Lua, keys, args []string) ([]string, error) {
-	messages, err := script.Exec(ctx, client, keys, args).ToArray()
+	return decodeScriptResult(script.Exec(ctx, client, keys, args))
+}
+
+type scriptResult interface {
+	ToArray() ([]valkeygo.ValkeyMessage, error)
+}
+
+func decodeScriptResult(result scriptResult) ([]string, error) {
+	messages, err := result.ToArray()
 	if err != nil {
 		return nil, err
 	}
+	stringMessages := make([]scriptMessage, len(messages))
+	for index := range messages {
+		stringMessages[index] = &messages[index]
+	}
+	return decodeScriptMessages(stringMessages)
+}
+
+type scriptMessage interface {
+	ToString() (string, error)
+}
+
+func decodeScriptMessages(messages []scriptMessage) ([]string, error) {
 	reply := make([]string, len(messages))
 	for index := range messages {
-		reply[index], err = messages[index].ToString()
+		value, err := messages[index].ToString()
 		if err != nil {
 			return nil, err
 		}
+		reply[index] = value
 	}
 	return reply, nil
 }

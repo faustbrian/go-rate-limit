@@ -46,8 +46,13 @@ func TestServiceMakesBackendFailureBehaviorExplicit(t *testing.T) {
 		decision.Backend != "broken" || decision.PolicyRevision != "v1" {
 		t.Fatalf("decision = %+v", decision)
 	}
-	if observation := <-observed; observation.Decision.Reason != ratelimit.ReasonFailOpen {
-		t.Fatalf("observation = %+v", observation)
+	select {
+	case observation := <-observed:
+		if observation.Decision.Reason != ratelimit.ReasonFailOpen {
+			t.Fatalf("observation = %+v", observation)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("observer did not receive the admission decision")
 	}
 
 	request = validRequest(t, ratelimit.FailClosed)

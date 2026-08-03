@@ -32,7 +32,10 @@ type Middleware func(http.Handler) http.Handler
 
 // New validates options and returns HTTP admission middleware.
 func New(options Options) (Middleware, error) {
-	if options.Service == nil || options.Policy.ID() == "" {
+	if options.Service == nil {
+		return nil, fmt.Errorf("%w: service and policy are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Policy.ID() == "" {
 		return nil, fmt.Errorf("%w: service and policy are required", ratelimit.ErrInvalidPolicy)
 	}
 	extractor, err := NewClientIPExtractor(options.ClientIP)
@@ -99,8 +102,5 @@ func writeHeaders(header http.Header, decision ratelimit.Decision, now time.Time
 }
 
 func ceilSeconds(duration time.Duration) int64 {
-	if duration <= 0 {
-		return 0
-	}
-	return int64(math.Ceil(duration.Seconds()))
+	return int64(math.Ceil(max(duration, 0).Seconds()))
 }

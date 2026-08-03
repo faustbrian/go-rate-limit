@@ -168,6 +168,8 @@ func (database *fakeDatabase) queryRow(context.Context, string, ...any) pgx.Row 
 type fakeTransaction struct {
 	rows        []pgx.Row
 	execErrs    []error
+	execQueries []string
+	execArgs    [][]any
 	commitErr   error
 	rollbackErr error
 }
@@ -178,7 +180,9 @@ func (tx *fakeTransaction) queryRow(context.Context, string, ...any) pgx.Row {
 	return row
 }
 
-func (tx *fakeTransaction) exec(context.Context, string, ...any) error {
+func (tx *fakeTransaction) exec(_ context.Context, query string, arguments ...any) error {
+	tx.execQueries = append(tx.execQueries, query)
+	tx.execArgs = append(tx.execArgs, append([]any(nil), arguments...))
 	if len(tx.execErrs) == 0 {
 		return nil
 	}

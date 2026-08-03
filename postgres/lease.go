@@ -32,8 +32,13 @@ func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest)
 	key := sha256.Sum256([]byte(request.Request.Policy.ID() + "\x00" + request.Request.Key.String()))
 	leaseDigest := sha256.Sum256([]byte(request.LeaseID))
 	lease, decision, err := executor.acquire(callCtx, key[:], request, hex.EncodeToString(leaseDigest[:]))
-	if err == nil || errors.Is(err, ratelimit.ErrRejected) ||
-		errors.Is(err, ratelimit.ErrLeaseNotOwned) {
+	if err == nil {
+		return lease, decision, nil
+	}
+	if errors.Is(err, ratelimit.ErrRejected) {
+		return lease, decision, err
+	}
+	if errors.Is(err, ratelimit.ErrLeaseNotOwned) {
 		return lease, decision, err
 	}
 	if errors.Is(err, ratelimit.ErrCorrupt) {
@@ -47,7 +52,16 @@ func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest)
 
 // Release transactionally verifies and relinquishes an owned lease.
 func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error {
-	if lease.ID == "" || lease.PolicyID == "" || lease.Key.String() == "" || lease.Cost == 0 {
+	if lease.ID == "" {
+		return ratelimit.ErrInvalidRequest
+	}
+	if lease.PolicyID == "" {
+		return ratelimit.ErrInvalidRequest
+	}
+	if lease.Key.String() == "" {
+		return ratelimit.ErrInvalidRequest
+	}
+	if lease.Cost == 0 {
 		return ratelimit.ErrInvalidRequest
 	}
 	executor, ok := store.executor.(leaseExecutor)
@@ -59,8 +73,13 @@ func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error {
 	key := sha256.Sum256([]byte(lease.PolicyID + "\x00" + lease.Key.String()))
 	leaseDigest := sha256.Sum256([]byte(lease.ID))
 	err := executor.release(callCtx, key[:], lease, hex.EncodeToString(leaseDigest[:]))
-	if err == nil || errors.Is(err, ratelimit.ErrLeaseNotFound) ||
-		errors.Is(err, ratelimit.ErrLeaseNotOwned) {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ratelimit.ErrLeaseNotFound) {
+		return err
+	}
+	if errors.Is(err, ratelimit.ErrLeaseNotOwned) {
 		return err
 	}
 	if errors.Is(err, ratelimit.ErrCorrupt) {
@@ -86,14 +105,13 @@ func (executor *nativeExecutor) acquire(ctx context.Context, key []byte, request
 		return ratelimit.Lease{}, ratelimit.Decision{}, err
 	}
 	next, lease, decision, resultErr := mutateLease(current, request, digest)
-	if resultErr != nil && !errors.Is(resultErr, ratelimit.ErrRejected) {
-		return ratelimit.Lease{}, ratelimit.Decision{}, resultErr
+	if resultErr != nil {
+		if !errors.Is(resultErr, ratelimit.ErrRejected) {
+			return ratelimit.Lease{}, ratelimit.Decision{}, resultErr
+		}
 	}
 	encoded := encodeState(next)
-	ttl := request.Request.Policy.LeaseDuration() * 2
-	if ttl < time.Second {
-		ttl = time.Second
-	}
+	ttl := max(request.Request.Policy.LeaseDuration()*2, time.Second)
 	if err := tx.exec(ctx, upsertStateSQL, key, encoded, request.Request.Now.Add(ttl), request.Request.Now); err != nil {
 		return ratelimit.Lease{}, ratelimit.Decision{}, err
 	}
@@ -113,14 +131,20 @@ func (executor *nativeExecutor) release(ctx context.Context, key []byte, lease r
 	if err != nil {
 		return err
 	}
-	if current == nil || current.Algorithm != ratelimit.Concurrency {
+	if current == nil {
+		return ratelimit.ErrLeaseNotFound
+	}
+	if current.Algorithm != ratelimit.Concurrency {
 		return ratelimit.ErrLeaseNotFound
 	}
 	existing, ok := current.Leases[digest]
 	if !ok {
 		return ratelimit.ErrLeaseNotFound
 	}
-	if existing.Cost != lease.Cost || existing.ExpiresMicros != lease.ExpiresAt.UnixMicro() {
+	if existing.Cost != lease.Cost {
+		return ratelimit.ErrLeaseNotOwned
+	}
+	if existing.ExpiresMicros != lease.ExpiresAt.UnixMicro() {
 		return ratelimit.ErrLeaseNotOwned
 	}
 	delete(current.Leases, digest)
@@ -161,9 +185,7 @@ func (executor *nativeExecutor) beginLocked(ctx context.Context, key []byte) (na
 func latestLeaseExpiry(leases map[string]persistedLease) time.Time {
 	var latest int64
 	for _, lease := range leases {
-		if lease.ExpiresMicros > latest {
-			latest = lease.ExpiresMicros
-		}
+		latest = max(latest, lease.ExpiresMicros)
 	}
 	return time.UnixMicro(latest)
 }

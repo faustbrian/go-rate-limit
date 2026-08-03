@@ -92,7 +92,13 @@ type Middleware func(Handler) Handler
 
 // New validates and copies options before constructing middleware.
 func New(options Options) (Middleware, error) {
-	if options.Service == nil || len(options.Rules) == 0 || len(options.Rules) > MaxRules {
+	if options.Service == nil {
+		return nil, fmt.Errorf("%w: service and bounded rules are required", ratelimit.ErrInvalidPolicy)
+	}
+	if len(options.Rules) == 0 {
+		return nil, fmt.Errorf("%w: service and bounded rules are required", ratelimit.ErrInvalidPolicy)
+	}
+	if len(options.Rules) > MaxRules {
 		return nil, fmt.Errorf("%w: service and bounded rules are required", ratelimit.ErrInvalidPolicy)
 	}
 	rules := append([]Rule(nil), options.Rules...)

@@ -22,6 +22,22 @@ func TestRPCMiddlewareConfigurationAndFailureEdges(t *testing.T) {
 
 	service := edgeService(t, nil)
 	policy := edgePolicy(t)
+	if CodeRateLimited != -32029 || CodeRateUnavailable != -32030 {
+		t.Fatalf("protocol codes = %d, %d", CodeRateLimited, CodeRateUnavailable)
+	}
+	exactRules := make([]Rule, MaxRules)
+	for index := range exactRules {
+		exactRules[index] = Rule{Policy: policy, Subject: Global("x")}
+	}
+	if _, err := New(Options{Service: service, Rules: exactRules}); err != nil {
+		t.Fatalf("New(maximum rules) error = %v", err)
+	}
+	if _, err := New(Options{Rules: []Rule{{Policy: policy, Subject: Global("x")}}}); !errors.Is(err, ratelimit.ErrInvalidPolicy) {
+		t.Fatalf("New(missing service) error = %v", err)
+	}
+	if _, err := New(Options{Service: service}); !errors.Is(err, ratelimit.ErrInvalidPolicy) {
+		t.Fatalf("New(missing rules) error = %v", err)
+	}
 	for _, options := range []Options{
 		{},
 		{Service: service, Rules: make([]Rule, MaxRules+1)},

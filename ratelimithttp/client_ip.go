@@ -73,7 +73,8 @@ func (extractor *ClientIPExtractor) ClientIP(request *http.Request) (netip.Addr,
 		}
 		addresses = append(addresses, address.Unmap())
 	}
-	for index := len(addresses) - 1; index >= 0; index-- {
+	for offset := range len(addresses) {
+		index := len(addresses) - 1 - offset
 		if !extractor.isTrusted(addresses[index]) {
 			return addresses[index], nil
 		}

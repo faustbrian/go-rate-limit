@@ -41,11 +41,16 @@ type Store struct {
 }
 
 func newStore(executor executor, options Options) (*Store, error) {
-	if executor == nil || options.Timeout <= 0 ||
-		(options.Clock != ClientClock && options.Clock != ServerClock) {
+	if executor == nil {
 		return nil, fmt.Errorf("%w: executor, timeout, and clock are required", ratelimit.ErrInvalidPolicy)
 	}
-	if options.LockTimeout <= 0 {
+	if options.Timeout < 1 {
+		return nil, fmt.Errorf("%w: executor, timeout, and clock are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Clock > ServerClock {
+		return nil, fmt.Errorf("%w: executor, timeout, and clock are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.LockTimeout < 1 {
 		options.LockTimeout = options.Timeout
 	}
 	return &Store{executor: executor, options: options}, nil

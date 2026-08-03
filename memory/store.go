@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/bits"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,9 +68,19 @@ type leaseState struct {
 
 // New validates options and constructs an empty Store.
 func New(options Options) (*Store, error) {
-	if options.MaxKeys <= 0 || options.MaxKeys > MaxConfiguredKeys ||
-		options.Shards <= 0 || options.Shards > MaxConfiguredShards ||
-		options.Shards > options.MaxKeys {
+	if options.MaxKeys < 1 {
+		return nil, fmt.Errorf("%w: positive cardinality and shard bounds are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.MaxKeys > MaxConfiguredKeys {
+		return nil, fmt.Errorf("%w: positive cardinality and shard bounds are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Shards <= 0 {
+		return nil, fmt.Errorf("%w: positive cardinality and shard bounds are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Shards > MaxConfiguredShards {
+		return nil, fmt.Errorf("%w: positive cardinality and shard bounds are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Shards > options.MaxKeys {
 		return nil, fmt.Errorf("%w: positive cardinality and shard bounds are required", ratelimit.ErrInvalidPolicy)
 	}
 	store := &Store{shards: make([]shard, options.Shards)}
@@ -162,9 +173,9 @@ func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest)
 	for id, existing := range current.leases {
 		if !existing.expiresAt.After(request.Request.Now) {
 			delete(current.leases, id)
-			continue
+		} else {
+			used += existing.cost
 		}
-		used += existing.cost
 	}
 	limit := request.Request.Policy.Limit()
 	remaining := limit - min(used, limit)
@@ -239,7 +250,10 @@ func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error) {
 	if store.closed.Load() {
 		return 0, ratelimit.ErrUnavailable
 	}
-	if now.IsZero() || idleFor <= 0 {
+	if now.IsZero() {
+		return 0, ratelimit.ErrInvalidRequest
+	}
+	if idleFor <= 0 {
 		return 0, ratelimit.ErrInvalidRequest
 	}
 	removed := 0
@@ -301,17 +315,9 @@ func (target *shard) getOrCreate(key string, request ratelimit.Request) (*state,
 func (target *shard) evictOldest(now time.Time) bool {
 	keys := make([]string, 0, len(target.states))
 	for key, current := range target.states {
-		activeLease := false
-		for _, lease := range current.leases {
-			if lease.expiresAt.After(now) {
-				activeLease = true
-				break
-			}
+		if !hasActiveLease(current.leases, now) {
+			keys = append(keys, key)
 		}
-		if activeLease {
-			continue
-		}
-		keys = append(keys, key)
 	}
 	if len(keys) == 0 {
 		return false
@@ -319,7 +325,7 @@ func (target *shard) evictOldest(now time.Time) bool {
 	sort.Slice(keys, func(left, right int) bool {
 		leftState, rightState := target.states[keys[left]], target.states[keys[right]]
 		if leftState.lastSeen.Equal(rightState.lastSeen) {
-			return keys[left] < keys[right]
+			return strings.Compare(keys[left], keys[right]) == -1
 		}
 		return leftState.lastSeen.Before(rightState.lastSeen)
 	})
@@ -364,17 +370,18 @@ func admitToken(current *state, request ratelimit.Request) (ratelimit.Decision, 
 }
 
 func refill(current *state, request ratelimit.Request) {
-	if !request.Now.After(current.lastRefill) || current.tokens == request.Policy.Limit() {
-		if request.Now.After(current.lastRefill) {
-			current.lastRefill = request.Now
-			current.remainder = 0
-		}
+	if !request.Now.After(current.lastRefill) {
+		return
+	}
+	if current.tokens == request.Policy.Limit() {
+		current.lastRefill = request.Now
+		current.remainder = 0
 		return
 	}
 	elapsed := uint64(request.Now.Sub(current.lastRefill).Microseconds())
 	high, low := bits.Mul64(elapsed, request.Policy.Capacity())
 	low, carry := bits.Add64(low, current.remainder, 0)
-	high += carry
+	high, _ = bits.Add64(high, carry, 0)
 	period := uint64(request.Policy.Period().Microseconds())
 	if high >= period {
 		current.tokens = request.Policy.Limit()
@@ -383,11 +390,10 @@ func refill(current *state, request ratelimit.Request) {
 		return
 	}
 	added, remainder := bits.Div64(high, low, period)
-	if added >= request.Policy.Limit()-current.tokens {
-		current.tokens = request.Policy.Limit()
+	current.tokens = min(current.tokens+added, request.Policy.Limit())
+	if current.tokens == request.Policy.Limit() {
 		current.remainder = 0
 	} else {
-		current.tokens += added
 		current.remainder = remainder
 	}
 	current.lastRefill = request.Now
@@ -437,8 +443,8 @@ func admitSliding(current *state, request ratelimit.Request) (ratelimit.Decision
 			continue
 		}
 		used += current.segments[slot].used
-		if current.segments[slot].used > 0 && current.segments[slot].index < earliest {
-			earliest = current.segments[slot].index
+		if current.segments[slot].used != 0 {
+			earliest = min(earliest, current.segments[slot].index)
 		}
 	}
 	current.used = used
@@ -496,9 +502,21 @@ func earliestLease(leases map[string]leaseState) time.Time {
 	return earliest
 }
 
+func hasActiveLease(leases map[string]leaseState, now time.Time) bool {
+	for _, lease := range leases {
+		if lease.expiresAt.After(now) {
+			return true
+		}
+	}
+	return false
+}
+
 func floorBoundary(value, size int64) int64 {
 	quotient := value / size
-	if value < 0 && value%size != 0 {
+	if value%size == 0 {
+		return quotient * size
+	}
+	if value>>63 == -1 {
 		quotient--
 	}
 	return quotient * size
@@ -513,10 +531,7 @@ func positiveMod(value int64, modulus int) int {
 }
 
 func nonnegative(duration time.Duration) time.Duration {
-	if duration < 0 {
-		return 0
-	}
-	return duration
+	return max(duration, 0)
 }
 
 var _ ratelimit.Backend = (*Store)(nil)

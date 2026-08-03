@@ -33,10 +33,7 @@ func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest)
 	if store.options.Clock == ServerClock {
 		serverClock = "1"
 	}
-	ttl := request.Request.Policy.LeaseDuration() * 2
-	if ttl < time.Second {
-		ttl = time.Second
-	}
+	ttl := max(request.Request.Policy.LeaseDuration()*2, time.Second)
 	args := []string{
 		"1", request.Request.Policy.ID(), request.Request.Policy.Revision(),
 		strconv.FormatUint(request.Request.Policy.Limit(), 10),
@@ -56,7 +53,16 @@ func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest)
 
 // Release atomically verifies and relinquishes an owned lease.
 func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error {
-	if lease.ID == "" || lease.PolicyID == "" || lease.Key.String() == "" || lease.Cost == 0 {
+	if lease.ID == "" {
+		return ratelimit.ErrInvalidRequest
+	}
+	if lease.PolicyID == "" {
+		return ratelimit.ErrInvalidRequest
+	}
+	if lease.Key.String() == "" {
+		return ratelimit.ErrInvalidRequest
+	}
+	if lease.Cost == 0 {
 		return ratelimit.ErrInvalidRequest
 	}
 	executor, ok := store.executor.(leaseExecutor)

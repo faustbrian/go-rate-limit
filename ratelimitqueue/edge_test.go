@@ -29,6 +29,15 @@ func TestQueueMiddlewareEdges(t *testing.T) {
 		}
 	}
 	policy := edgePolicy(t)
+	for _, options := range []Options{
+		{Service: edgeService(t), Subject: ByQueueAndTenant()},
+		{Service: edgeService(t), Policy: policy},
+		{Policy: policy, Subject: ByQueueAndTenant()},
+	} {
+		if _, err := New(options); !errors.Is(err, ratelimit.ErrInvalidPolicy) {
+			t.Fatalf("New(incomplete %+v) error = %v", options, err)
+		}
+	}
 	tests := []struct {
 		name    string
 		subject SubjectFunc
@@ -90,6 +99,11 @@ func TestQueueSubjects(t *testing.T) {
 	for _, function := range []SubjectFunc{ByQueueAndTenant(), ByPrincipal()} {
 		if _, err := function(Message{}); !errors.Is(err, ratelimit.ErrInvalidKey) {
 			t.Fatalf("empty subject error = %v", err)
+		}
+	}
+	for _, message := range []Message{{Queue: "q"}, {Tenant: "t"}} {
+		if _, err := ByQueueAndTenant()(message); !errors.Is(err, ratelimit.ErrInvalidKey) {
+			t.Fatalf("ByQueueAndTenant(%+v) error = %v", message, err)
 		}
 	}
 	subject, err := ByPrincipal()(Message{Principal: "user-1"})

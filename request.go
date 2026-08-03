@@ -19,8 +19,19 @@ type Request struct {
 
 // Validate checks that all request inputs are present and bounded by Policy.
 func (r Request) Validate() error {
-	if r.Policy.id == "" || r.Key.value == "" || r.Now.IsZero() ||
-		r.Cost == 0 || r.Cost > r.Policy.maxCost {
+	if r.Policy.id == "" {
+		return fmt.Errorf("%w: policy, key, time, and bounded cost are required", ErrInvalidRequest)
+	}
+	if r.Key.value == "" {
+		return fmt.Errorf("%w: policy, key, time, and bounded cost are required", ErrInvalidRequest)
+	}
+	if r.Now.IsZero() {
+		return fmt.Errorf("%w: policy, key, time, and bounded cost are required", ErrInvalidRequest)
+	}
+	if r.Cost == 0 {
+		return fmt.Errorf("%w: policy, key, time, and bounded cost are required", ErrInvalidRequest)
+	}
+	if r.Cost > r.Policy.maxCost {
 		return fmt.Errorf("%w: policy, key, time, and bounded cost are required", ErrInvalidRequest)
 	}
 	micros := r.Now.UnixMicro()

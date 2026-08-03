@@ -1,6 +1,7 @@
 package valkey
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -14,6 +15,10 @@ func TestNewRequiresNativeClient(t *testing.T) {
 	store, err := New(nil, Options{Prefix: "rl", Timeout: time.Second})
 	if store != nil || !errors.Is(err, ratelimit.ErrInvalidPolicy) {
 		t.Fatalf("New(nil) = %v, %v", store, err)
+	}
+	store, err = Open(context.Background(), nil, Options{Prefix: "rl", Timeout: time.Second})
+	if store != nil || !errors.Is(err, ratelimit.ErrInvalidPolicy) {
+		t.Fatalf("Open(nil) = %v, %v", store, err)
 	}
 }
 

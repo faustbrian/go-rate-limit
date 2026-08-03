@@ -88,8 +88,19 @@ func (service *Service) Acquire(ctx context.Context, request LeaseRequest) (leas
 
 // Release relinquishes a lease through the backend that owns it.
 func (service *Service) Release(ctx context.Context, lease Lease) error {
-	if lease.ID == "" || lease.Key.String() == "" || lease.PolicyID == "" ||
-		lease.Cost == 0 || lease.ExpiresAt.IsZero() {
+	if lease.ID == "" {
+		return fmt.Errorf("%w: complete lease is required", ErrInvalidRequest)
+	}
+	if lease.Key.String() == "" {
+		return fmt.Errorf("%w: complete lease is required", ErrInvalidRequest)
+	}
+	if lease.PolicyID == "" {
+		return fmt.Errorf("%w: complete lease is required", ErrInvalidRequest)
+	}
+	if lease.Cost == 0 {
+		return fmt.Errorf("%w: complete lease is required", ErrInvalidRequest)
+	}
+	if lease.ExpiresAt.IsZero() {
 		return fmt.Errorf("%w: complete lease is required", ErrInvalidRequest)
 	}
 	if lease.Backend != "" && lease.Backend != service.backend.Name() {

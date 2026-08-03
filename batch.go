@@ -37,7 +37,10 @@ type BatchDecision struct {
 
 // Batch evaluates a bounded list with per-item atomicity and no hidden retries.
 func (service *Service) Batch(ctx context.Context, batch BatchRequest) (BatchDecision, error) {
-	if len(batch.Requests) == 0 || len(batch.Requests) > MaxBatchSize {
+	if len(batch.Requests) == 0 {
+		return BatchDecision{}, fmt.Errorf("%w: batch size must be between 1 and %d", ErrInvalidRequest, MaxBatchSize)
+	}
+	if len(batch.Requests) > MaxBatchSize {
 		return BatchDecision{}, fmt.Errorf("%w: batch size must be between 1 and %d", ErrInvalidRequest, MaxBatchSize)
 	}
 	if batch.Atomicity == AtomicityAllOrNothing {

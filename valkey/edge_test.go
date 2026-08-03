@@ -14,11 +14,13 @@ import (
 type fullExecutor struct {
 	fakeExecutor
 	acquireReply []string
+	acquireArgs  []string
 	releaseReply []string
 	leaseErr     error
 }
 
-func (executor *fullExecutor) acquire(context.Context, []string, []string) ([]string, error) {
+func (executor *fullExecutor) acquire(_ context.Context, _ []string, args []string) ([]string, error) {
+	executor.acquireArgs = append([]string(nil), args...)
 	return executor.acquireReply, executor.leaseErr
 }
 

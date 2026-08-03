@@ -47,10 +47,22 @@ type Store struct {
 }
 
 func newStore(executor executor, options Options) (*Store, error) {
-	if executor == nil || options.Prefix == "" || len(options.Prefix) > MaxPrefixBytes ||
-		options.Timeout <= 0 ||
-		strings.ContainsAny(options.Prefix, "{}\x00\r\n ") ||
-		(options.Clock != ClientClock && options.Clock != ServerClock) {
+	if executor == nil {
+		return nil, fmt.Errorf("%w: safe prefix, timeout, clock, and executor are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Prefix == "" {
+		return nil, fmt.Errorf("%w: safe prefix, timeout, clock, and executor are required", ratelimit.ErrInvalidPolicy)
+	}
+	if len(options.Prefix) > MaxPrefixBytes {
+		return nil, fmt.Errorf("%w: safe prefix, timeout, clock, and executor are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Timeout < 1 {
+		return nil, fmt.Errorf("%w: safe prefix, timeout, clock, and executor are required", ratelimit.ErrInvalidPolicy)
+	}
+	if strings.ContainsAny(options.Prefix, "{}\x00\r\n ") {
+		return nil, fmt.Errorf("%w: safe prefix, timeout, clock, and executor are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Clock > ServerClock {
 		return nil, fmt.Errorf("%w: safe prefix, timeout, clock, and executor are required", ratelimit.ErrInvalidPolicy)
 	}
 	return &Store{executor: executor, options: options}, nil
@@ -90,10 +102,7 @@ func (store *Store) args(request ratelimit.Request) []string {
 	if store.options.Clock == ServerClock {
 		serverClock = "1"
 	}
-	ttl := request.Policy.Period() * 2
-	if ttl < time.Second {
-		ttl = time.Second
-	}
+	ttl := max(request.Policy.Period()*2, time.Second)
 	return []string{
 		"1",
 		string(request.Policy.Algorithm()),
@@ -136,7 +145,10 @@ func decodeDecision(reply []string) (ratelimit.Decision, error) {
 		return ratelimit.Decision{}, fmt.Errorf("%w: reset", ratelimit.ErrCorrupt)
 	}
 	retryMicros, err := strconv.ParseInt(reply[4], 10, 64)
-	if err != nil || retryMicros < 0 {
+	if err != nil {
+		return ratelimit.Decision{}, fmt.Errorf("%w: retry-after", ratelimit.ErrCorrupt)
+	}
+	if retryMicros < 0 {
 		return ratelimit.Decision{}, fmt.Errorf("%w: retry-after", ratelimit.ErrCorrupt)
 	}
 	reason := ratelimit.Reason(reply[5])

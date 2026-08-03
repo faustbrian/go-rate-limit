@@ -23,4 +23,7 @@ func TestKeyAcceptsAuthenticationPrincipalContractWithoutDependency(t *testing.T
 	if _, err := ratelimitprincipal.Key(principal{}); !errors.Is(err, ratelimit.ErrInvalidKey) {
 		t.Fatalf("anonymous Key() error = %v", err)
 	}
+	if _, err := ratelimitprincipal.Key(nil); !errors.Is(err, ratelimit.ErrInvalidKey) {
+		t.Fatalf("nil Key() error = %v", err)
+	}
 }

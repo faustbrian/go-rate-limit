@@ -51,35 +51,45 @@ func mutateLease(current *persistedState, request ratelimit.LeaseRequest, digest
 			Algorithm: ratelimit.Concurrency,
 			Leases:    make(map[string]persistedLease),
 		}
-	} else if current.Schema != stateSchema ||
-		current.PolicyID != request.Request.Policy.ID() ||
-		current.Algorithm != ratelimit.Concurrency {
-		return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+	} else {
+		if current.Schema != stateSchema {
+			return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
+		if current.PolicyID != request.Request.Policy.ID() {
+			return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
+		if current.Algorithm != ratelimit.Concurrency {
+			return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
 	}
 	if current.Leases == nil {
 		current.Leases = make(map[string]persistedLease)
 	}
 	current.Revision = request.Request.Policy.Revision()
 	now := request.Request.Now.UnixMicro()
-	if now < current.ObservedMicros {
-		now = current.ObservedMicros
-		request.Request.Now = time.UnixMicro(now)
+	requestedNow := now
+	now = max(now, current.ObservedMicros)
+	if now != requestedNow {
+		request.Request.Now = time.UnixMicro(now).UTC()
 	}
 	current.ObservedMicros = now
 	var used uint64
-	var earliest int64
+	earliest := int64(math.MaxInt64)
 	for key, lease := range current.Leases {
 		if lease.ExpiresMicros <= now {
 			delete(current.Leases, key)
-			continue
-		}
-		if lease.Cost == 0 ||
-			lease.Cost > ratelimit.MaxConcurrencyLeases-min(used, uint64(ratelimit.MaxConcurrencyLeases)) {
-			return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
-		}
-		used += lease.Cost
-		if earliest == 0 || lease.ExpiresMicros < earliest {
-			earliest = lease.ExpiresMicros
+		} else {
+			if lease.Cost == 0 {
+				return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+			}
+			if lease.Cost > ratelimit.MaxConcurrencyLeases {
+				return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+			}
+			if used > ratelimit.MaxConcurrencyLeases-lease.Cost {
+				return nil, ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+			}
+			used += lease.Cost
+			earliest = min(earliest, lease.ExpiresMicros)
 		}
 	}
 	if existing, ok := current.Leases[digest]; ok {
@@ -132,12 +142,21 @@ func mutateState(current *persistedState, request ratelimit.Request) (*persisted
 			Tokens: request.Policy.Limit(), LastMicros: request.Now.UnixMicro(),
 			ObservedMicros: request.Now.UnixMicro(),
 		}
-	} else if current.Schema != stateSchema || current.PolicyID != request.Policy.ID() ||
-		current.Algorithm != request.Policy.Algorithm() {
-		return nil, ratelimit.Decision{}, ratelimit.ErrCorrupt
+	} else {
+		if current.Schema != stateSchema {
+			return nil, ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
+		if current.PolicyID != request.Policy.ID() {
+			return nil, ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
+		if current.Algorithm != request.Policy.Algorithm() {
+			return nil, ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
 	}
-	if request.Now.UnixMicro() < current.ObservedMicros {
-		request.Now = time.UnixMicro(current.ObservedMicros)
+	requestedMicros := request.Now.UnixMicro()
+	observedMicros := max(requestedMicros, current.ObservedMicros)
+	if observedMicros != requestedMicros {
+		request.Now = time.UnixMicro(observedMicros).UTC()
 	}
 	current.ObservedMicros = request.Now.UnixMicro()
 	current.Revision = request.Policy.Revision()
@@ -156,24 +175,26 @@ func mutateState(current *persistedState, request ratelimit.Request) (*persisted
 func mutateToken(current *persistedState, request ratelimit.Request) (ratelimit.Decision, error) {
 	now := request.Now.UnixMicro()
 	period := uint64(request.Policy.Period().Microseconds())
-	if now > current.LastMicros && current.Tokens < request.Policy.Limit() {
-		elapsed := uint64(now - current.LastMicros)
-		high, low := bits.Mul64(elapsed, request.Policy.Capacity())
-		low, carry := bits.Add64(low, current.Remainder, 0)
-		high += carry
-		if high >= period {
-			current.Tokens, current.Remainder = request.Policy.Limit(), 0
-		} else {
-			added, remainder := bits.Div64(high, low, period)
-			if added >= request.Policy.Limit()-current.Tokens {
+	elapsedDuration := time.UnixMicro(now).Sub(time.UnixMicro(current.LastMicros))
+	if elapsedDuration >= time.Microsecond {
+		if current.Tokens < request.Policy.Limit() {
+			elapsed := uint64(elapsedDuration.Microseconds())
+			high, low := bits.Mul64(elapsed, request.Policy.Capacity())
+			low, carry := bits.Add64(low, current.Remainder, 0)
+			high, _ = bits.Add64(high, carry, 0)
+			if high >= period {
 				current.Tokens, current.Remainder = request.Policy.Limit(), 0
 			} else {
-				current.Tokens += added
-				current.Remainder = remainder
+				added, remainder := bits.Div64(high, low, period)
+				gap := request.Policy.Limit() - current.Tokens
+				if added >= gap {
+					current.Tokens, current.Remainder = request.Policy.Limit(), 0
+				} else {
+					current.Tokens += added
+					current.Remainder = remainder
+				}
 			}
 		}
-	}
-	if now > current.LastMicros {
 		current.LastMicros = now
 	}
 	limit := request.Policy.Limit()
@@ -234,11 +255,11 @@ func mutateSliding(current *persistedState, request ratelimit.Request) (ratelimi
 	for slot := range current.Segments {
 		if current.Segments[slot].Index <= oldest {
 			current.Segments[slot] = persistedSegment{}
-			continue
-		}
-		current.Used += current.Segments[slot].Used
-		if current.Segments[slot].Used > 0 && current.Segments[slot].Index < earliest {
-			earliest = current.Segments[slot].Index
+		} else {
+			current.Used += current.Segments[slot].Used
+			if current.Segments[slot].Used != 0 {
+				earliest = min(earliest, current.Segments[slot].Index)
+			}
 		}
 	}
 	slot := positiveRemainder(index, stateSegments)
@@ -261,10 +282,7 @@ func consume(current *persistedState, request ratelimit.Request, reset time.Time
 	used := min(current.Used, limit)
 	remaining := limit - used
 	if request.Cost > remaining {
-		retry := reset.Sub(request.Now)
-		if retry < 0 {
-			retry = 0
-		}
+		retry := max(reset.Sub(request.Now), time.Duration(0))
 		return ratelimit.Decision{
 			Allowed: false, Limit: limit, Remaining: remaining,
 			Reset: reset, RetryAfter: retry, Reason: ratelimit.ReasonLimited,
@@ -292,7 +310,13 @@ func decodeState(encoded []byte) (*persistedState, error) {
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return nil, fmt.Errorf("%w: trailing state data", ratelimit.ErrCorrupt)
 	}
-	if state.Schema != stateSchema || state.PolicyID == "" || state.Algorithm == "" {
+	if state.Schema != stateSchema {
+		return nil, fmt.Errorf("%w: invalid state identity", ratelimit.ErrCorrupt)
+	}
+	if state.PolicyID == "" {
+		return nil, fmt.Errorf("%w: invalid state identity", ratelimit.ErrCorrupt)
+	}
+	if state.Algorithm == "" {
 		return nil, fmt.Errorf("%w: invalid state identity", ratelimit.ErrCorrupt)
 	}
 	return &state, nil
@@ -300,7 +324,10 @@ func decodeState(encoded []byte) (*persistedState, error) {
 
 func floor(value, size int64) int64 {
 	quotient := value / size
-	if value < 0 && value%size != 0 {
+	if value%size == 0 {
+		return quotient * size
+	}
+	if value>>63 == -1 {
 		quotient--
 	}
 	return quotient * size
@@ -308,7 +335,7 @@ func floor(value, size int64) int64 {
 
 func positiveRemainder(value int64, modulus int) int {
 	result := value % int64(modulus)
-	if result < 0 {
+	if result>>63 == -1 {
 		result += int64(modulus)
 	}
 	return int(result)

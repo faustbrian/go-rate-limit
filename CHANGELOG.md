@@ -7,6 +7,9 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Strengthen exact mutation boundaries across core validation, in-memory and
+  distributed backends, and transport adapters without changing accepted
+  inputs or admission semantics.
 - Replace package-specific mutation floors and accepted timeouts with the
   canonical exact-100 repository runner.
 - Require owned sibling modules at local `v0.0.0`; clean external consumers

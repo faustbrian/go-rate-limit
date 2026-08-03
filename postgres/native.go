@@ -82,7 +82,7 @@ func New(pool *pgxpool.Pool, options Options) (*Store, error) {
 	if pool == nil {
 		return nil, fmt.Errorf("%w: pgx pool is required", ratelimit.ErrInvalidPolicy)
 	}
-	if options.LockTimeout <= 0 {
+	if options.LockTimeout < 1 {
 		options.LockTimeout = options.Timeout
 	}
 	return newStore(&nativeExecutor{database: poolDatabase{pool: pool}, options: options}, options)
@@ -118,7 +118,10 @@ func (store *Store) Check(ctx context.Context) error {
 
 // Cleanup deletes at most batch expired states using SKIP LOCKED.
 func (store *Store) Cleanup(ctx context.Context, batch int) (int64, error) {
-	if batch <= 0 || batch > MaxCleanupBatch {
+	if batch < 1 {
+		return 0, fmt.Errorf("%w: cleanup batch must be positive", ratelimit.ErrInvalidRequest)
+	}
+	if batch > MaxCleanupBatch {
 		return 0, fmt.Errorf("%w: cleanup batch must be positive", ratelimit.ErrInvalidRequest)
 	}
 	native, ok := store.executor.(*nativeExecutor)
@@ -146,14 +149,13 @@ func (executor *nativeExecutor) admit(ctx context.Context, key []byte, request r
 		return ratelimit.Decision{}, err
 	}
 	next, decision, resultErr := mutateState(current, request)
-	if resultErr != nil && !errors.Is(resultErr, ratelimit.ErrRejected) {
-		return ratelimit.Decision{}, resultErr
+	if resultErr != nil {
+		if !errors.Is(resultErr, ratelimit.ErrRejected) {
+			return ratelimit.Decision{}, resultErr
+		}
 	}
 	encoded := encodeState(next)
-	ttl := request.Policy.Period() * 2
-	if ttl < time.Second {
-		ttl = time.Second
-	}
+	ttl := max(request.Policy.Period()*2, time.Second)
 	if err := tx.exec(ctx, upsertStateSQL, key, encoded, request.Now.Add(ttl), request.Now); err != nil {
 		return ratelimit.Decision{}, err
 	}
@@ -173,13 +175,13 @@ func loadState(ctx context.Context, tx nativeTransaction, key []byte, now time.T
 	if err != nil {
 		return nil, err
 	}
-	if !expiresAt.After(now) {
-		if err := tx.exec(ctx, deleteStateSQL, key); err != nil {
-			return nil, err
-		}
-		return nil, nil
+	if expiresAt.After(now) {
+		return decodeState(encoded)
 	}
-	return decodeState(encoded)
+	if err := tx.exec(ctx, deleteStateSQL, key); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func advisoryKey(key []byte) int64 {

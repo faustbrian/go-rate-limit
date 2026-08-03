@@ -77,7 +77,13 @@ func (deferred *Deferred) Unwrap() error {
 
 // New validates options and returns queue admission middleware.
 func New(options Options) (Middleware, error) {
-	if options.Service == nil || options.Policy.ID() == "" || options.Subject == nil {
+	if options.Service == nil {
+		return nil, fmt.Errorf("%w: service, policy, and subject are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Policy.ID() == "" {
+		return nil, fmt.Errorf("%w: service, policy, and subject are required", ratelimit.ErrInvalidPolicy)
+	}
+	if options.Subject == nil {
 		return nil, fmt.Errorf("%w: service, policy, and subject are required", ratelimit.ErrInvalidPolicy)
 	}
 	if options.Cost == nil {
@@ -119,7 +125,10 @@ func New(options Options) (Middleware, error) {
 // ByQueueAndTenant derives an unambiguous composite subject.
 func ByQueueAndTenant() SubjectFunc {
 	return func(message Message) (ratelimit.Subject, error) {
-		if message.Queue == "" || message.Tenant == "" {
+		if message.Queue == "" {
+			return ratelimit.Subject{}, fmt.Errorf("%w: queue and tenant are required", ratelimit.ErrInvalidKey)
+		}
+		if message.Tenant == "" {
 			return ratelimit.Subject{}, fmt.Errorf("%w: queue and tenant are required", ratelimit.ErrInvalidKey)
 		}
 		value := strconv.Itoa(len(message.Queue)) + ":" + message.Queue + message.Tenant

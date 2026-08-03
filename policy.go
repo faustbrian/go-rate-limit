@@ -96,7 +96,10 @@ func NewPolicy(spec PolicySpec) (Policy, error) {
 		return Policy{}, fmt.Errorf("%w: identity and capacity are required", ErrInvalidPolicy)
 	}
 	limit, carry := bits.Add64(spec.Capacity, spec.Burst, 0)
-	if carry != 0 || limit > maxExactInteger {
+	if carry != 0 {
+		return Policy{}, fmt.Errorf("%w: capacity plus burst exceeds exact arithmetic", ErrInvalidPolicy)
+	}
+	if limit > maxExactInteger {
 		return Policy{}, fmt.Errorf("%w: capacity plus burst exceeds exact arithmetic", ErrInvalidPolicy)
 	}
 	switch spec.Algorithm {

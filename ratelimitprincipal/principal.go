@@ -14,7 +14,10 @@ type Principal interface {
 
 // Key derives a bounded, irreversibly hashed key from principal.
 func Key(principal Principal) (ratelimit.Key, error) {
-	if principal == nil || principal.Subject() == "" {
+	if principal == nil {
+		return ratelimit.Key{}, fmt.Errorf("%w: authenticated principal is required", ratelimit.ErrInvalidKey)
+	}
+	if principal.Subject() == "" {
 		return ratelimit.Key{}, fmt.Errorf("%w: authenticated principal is required", ratelimit.ErrInvalidKey)
 	}
 	return ratelimit.NewKey(ratelimit.KeySpec{
