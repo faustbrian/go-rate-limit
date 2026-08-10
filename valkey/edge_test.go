@@ -172,6 +172,30 @@ func TestNativeCheckAndScriptEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(client.Close)
+	// Mutation subprocesses may be terminated before cleanup. Establish the
+	// required policy in every process before exercising the live backend.
+	setPolicy := func(policy string) {
+		t.Helper()
+		if err := client.Do(context.Background(), client.B().ConfigSet().ParameterValue().
+			ParameterValue("maxmemory-policy", policy).Build()).Error(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setPolicy("noeviction")
+	t.Cleanup(func() {
+		cleanupClient, cleanupErr := valkeygo.NewClient(valkeygo.ClientOption{
+			InitAddress: []string{address},
+		})
+		if cleanupErr != nil {
+			t.Errorf("create cleanup client: %v", cleanupErr)
+			return
+		}
+		defer cleanupClient.Close()
+		if cleanupErr := cleanupClient.Do(context.Background(), cleanupClient.B().ConfigSet().ParameterValue().
+			ParameterValue("maxmemory-policy", "noeviction").Build()).Error(); cleanupErr != nil {
+			t.Errorf("restore maxmemory policy: %v", cleanupErr)
+		}
+	})
 	store, err := New(client, Options{Prefix: "edge", Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
@@ -179,10 +203,7 @@ func TestNativeCheckAndScriptEdges(t *testing.T) {
 	if err := store.Check(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := client.Do(context.Background(), client.B().ConfigSet().ParameterValue().
-		ParameterValue("maxmemory-policy", "allkeys-lru").Build()).Error(); err != nil {
-		t.Fatal(err)
-	}
+	setPolicy("allkeys-lru")
 	if err := store.Check(context.Background()); !errors.Is(err, ratelimit.ErrUnavailable) {
 		t.Fatalf("evicting Check() error = %v", err)
 	}
@@ -191,10 +212,7 @@ func TestNativeCheckAndScriptEdges(t *testing.T) {
 	}); !errors.Is(err, ratelimit.ErrUnavailable) {
 		t.Fatalf("evicting Open() error = %v", err)
 	}
-	if err := client.Do(context.Background(), client.B().ConfigSet().ParameterValue().
-		ParameterValue("maxmemory-policy", "noeviction").Build()).Error(); err != nil {
-		t.Fatal(err)
-	}
+	setPolicy("noeviction")
 	fakeStore, err := newStore(&fakeExecutor{}, Options{Prefix: "edge", Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)

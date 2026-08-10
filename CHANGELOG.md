@@ -7,6 +7,9 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Isolate live Valkey verification from interrupted mutation subprocesses by
+  re-establishing the required `noeviction` policy before each process uses the
+  disposable backend.
 - Strengthen exact mutation boundaries across core validation, in-memory and
   distributed backends, and transport adapters without changing accepted
   inputs or admission semantics.

@@ -26,6 +26,10 @@ func TestValkey9AdmissionLeaseAndNOSCRIPTRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(client.Close)
+	if err := client.Do(context.Background(), client.B().ConfigSet().ParameterValue().
+		ParameterValue("maxmemory-policy", "noeviction").Build()).Error(); err != nil {
+		t.Fatalf("configure disposable Valkey: %v", err)
+	}
 	runID := strconv.FormatInt(time.Now().UnixNano(), 36)
 	prefix := "rate-limit-integration-" + runID
 	store, err := valkey.Open(context.Background(), client, valkey.Options{
