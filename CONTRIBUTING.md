@@ -1,6 +1,6 @@
 # Contributing
 
-Use Go 1.26.5 or newer in the 1.26 line. Keep core APIs transport neutral and
+Use Go 1.26.6 or newer in the 1.26 line. Keep core APIs transport neutral and
 do not add authorization, billing, outbound retry, queue ownership, or hidden
 sleeping.
 
