@@ -11,6 +11,9 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Refresh local `v0.0.0` owned-module checksums after dependency manifests and
+  release notes were normalized; runtime behavior and public APIs are
+  unchanged.
 - Isolate live Valkey verification from interrupted mutation subprocesses by
   re-establishing the required `noeviction` policy before each process uses the
   disposable backend.
