@@ -2,25 +2,40 @@ version: "2"
 
 run:
   timeout: 10m
+  tests: true
 
 linters:
-  default: standard
+  default: none
   enable:
     - bodyclose
+    - contextcheck
+    - copyloopvar
+    - errcheck
     - errorlint
     - exhaustive
     - gocritic
-    - gosec
+    - govet
+    - ineffassign
+    - misspell
     - nilerr
     - noctx
-    - prealloc
     - revive
     - rowserrcheck
     - sqlclosecheck
+    - staticcheck
     - testifylint
     - unconvert
-    - unparam
-    - wastedassign
+    - unused
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    revive:
+      confidence: 0.8
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 issues:
   max-issues-per-linter: 0
