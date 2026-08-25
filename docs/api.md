@@ -38,4 +38,4 @@ tenant-sensitive values should always be hashed.
 
 The authoritative exported declarations are available through:
 
-    go doc -all github.com/faustbrian/golib/pkg/rate-limit
+    go doc -all github.com/faustbrian/go-rate-limit

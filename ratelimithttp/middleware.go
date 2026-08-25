@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 )
 
 // Options configures inbound HTTP admission.

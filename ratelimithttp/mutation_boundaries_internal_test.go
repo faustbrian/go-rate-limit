@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 )
 
 func TestClientIPConfigurationMaximumIsInclusive(t *testing.T) {

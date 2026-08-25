@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
-	"github.com/faustbrian/golib/pkg/rate-limit/ratelimittest"
-	"github.com/faustbrian/golib/pkg/rate-limit/valkey"
+	ratelimit "github.com/faustbrian/go-rate-limit"
+	"github.com/faustbrian/go-rate-limit/ratelimittest"
+	"github.com/faustbrian/go-rate-limit/valkey"
 	valkeygo "github.com/valkey-io/valkey-go"
 )
 

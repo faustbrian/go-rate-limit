@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-rate-limit",
+  "packages": [
+    {
+      "module_directory": ".",
+      "directory": ".",
+      "name": "ratelimit",
+      "import_path": "github.com/faustbrian/go-rate-limit",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "memory",
+      "name": "memory",
+      "import_path": "github.com/faustbrian/go-rate-limit/memory",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "postgres",
+      "name": "postgres",
+      "import_path": "github.com/faustbrian/go-rate-limit/postgres",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimithttp",
+      "name": "ratelimithttp",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimithttp",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimitlog",
+      "name": "ratelimitlog",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimitlog",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimitprincipal",
+      "name": "ratelimitprincipal",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimitprincipal",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimitqueue",
+      "name": "ratelimitqueue",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimitqueue",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimitrpc",
+      "name": "ratelimitrpc",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimitrpc",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimittelemetry",
+      "name": "ratelimittelemetry",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimittelemetry",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ratelimittest",
+      "name": "ratelimittest",
+      "import_path": "github.com/faustbrian/go-rate-limit/ratelimittest",
+      "kind": "test support",
+      "production": false,
+      "executable": true,
+      "coverage_required": false,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "valkey",
+      "name": "valkey",
+      "import_path": "github.com/faustbrian/go-rate-limit/valkey",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    }
+  ]
+}

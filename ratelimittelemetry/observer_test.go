@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
-	"github.com/faustbrian/golib/pkg/rate-limit/ratelimittelemetry"
+	ratelimit "github.com/faustbrian/go-rate-limit"
+	"github.com/faustbrian/go-rate-limit/ratelimittelemetry"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )

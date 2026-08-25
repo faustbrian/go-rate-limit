@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 )
 
 func TestBatchDocumentsPerItemAtomicity(t *testing.T) {

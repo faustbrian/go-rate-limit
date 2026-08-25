@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
-const scopeName = "github.com/faustbrian/golib/pkg/rate-limit/ratelimittelemetry"
+const scopeName = "github.com/faustbrian/go-rate-limit/ratelimittelemetry"
 
 // Options configures OpenTelemetry metric instruments.
 type Options struct {

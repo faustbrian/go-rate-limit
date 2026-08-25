@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
-	"github.com/faustbrian/golib/pkg/rate-limit/ratelimitrpc"
+	ratelimit "github.com/faustbrian/go-rate-limit"
+	"github.com/faustbrian/go-rate-limit/ratelimitrpc"
 )
 
 type backend struct {

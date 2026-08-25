@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 	valkeygo "github.com/valkey-io/valkey-go"
 )
 

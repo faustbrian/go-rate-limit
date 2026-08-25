@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 	"github.com/jackc/pgx/v5"
 )
 

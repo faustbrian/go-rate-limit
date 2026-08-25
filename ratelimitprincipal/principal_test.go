@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
-	"github.com/faustbrian/golib/pkg/rate-limit/ratelimitprincipal"
+	ratelimit "github.com/faustbrian/go-rate-limit"
+	"github.com/faustbrian/go-rate-limit/ratelimitprincipal"
 )
 
 type principal struct{ subject string }

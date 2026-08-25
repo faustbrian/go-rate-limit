@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 )
 
 // Message contains bounded queue admission inputs, not a durable payload.

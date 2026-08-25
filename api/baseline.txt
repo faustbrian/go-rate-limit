@@ -1,6 +1,6 @@
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit
+PACKAGE github.com/faustbrian/go-rate-limit
 
-package ratelimit // import "github.com/faustbrian/golib/pkg/rate-limit"
+package ratelimit // import "github.com/faustbrian/go-rate-limit"
 
 Package ratelimit defines transport-neutral admission policies, requests,
 decisions, observations, batching, and concurrency leases.
@@ -358,9 +358,9 @@ type Subject struct {
 }
     Subject is a typed identity input used only to derive a bounded Key.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/memory
+PACKAGE github.com/faustbrian/go-rate-limit/memory
 
-package memory // import "github.com/faustbrian/golib/pkg/rate-limit/memory"
+package memory // import "github.com/faustbrian/go-rate-limit/memory"
 
 Package memory provides bounded, sharded, process-local admission state.
 
@@ -413,9 +413,9 @@ func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
 func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error)
     Sweep removes idle keys and expired leases, returning the keys removed.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/postgres
+PACKAGE github.com/faustbrian/go-rate-limit/postgres
 
-package postgres // import "github.com/faustbrian/golib/pkg/rate-limit/postgres"
+package postgres // import "github.com/faustbrian/go-rate-limit/postgres"
 
 Package postgres provides transactional admission backed by PostgreSQL and
 pgx. It is intended for coordination-heavy workloads, not as the default
@@ -499,9 +499,9 @@ func (store *Store) Name() string
 func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
     Release transactionally verifies and relinquishes an owned lease.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimithttp
+PACKAGE github.com/faustbrian/go-rate-limit/ratelimithttp
 
-package ratelimithttp // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimithttp"
+package ratelimithttp // import "github.com/faustbrian/go-rate-limit/ratelimithttp"
 
 Package ratelimithttp provides net/http inbound admission middleware and strict
 trusted-proxy client IP extraction.
@@ -561,9 +561,9 @@ type Options struct {
 }
     Options configures inbound HTTP admission.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitlog
+PACKAGE github.com/faustbrian/go-rate-limit/ratelimitlog
 
-package ratelimitlog // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitlog"
+package ratelimitlog // import "github.com/faustbrian/go-rate-limit/ratelimitlog"
 
 Package ratelimitlog adapts bounded observations to structured slog records.
 
@@ -588,9 +588,9 @@ type Options struct {
 }
     Options configures structured observation logging.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitprincipal
+PACKAGE github.com/faustbrian/go-rate-limit/ratelimitprincipal
 
-package ratelimitprincipal // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitprincipal"
+package ratelimitprincipal // import "github.com/faustbrian/go-rate-limit/ratelimitprincipal"
 
 Package ratelimitprincipal adapts authentication principals to hashed admission
 keys without depending on a concrete authentication package.
@@ -609,9 +609,9 @@ type Principal interface {
 }
     Principal is the narrow identity contract required for key derivation.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitqueue
+PACKAGE github.com/faustbrian/go-rate-limit/ratelimitqueue
 
-package ratelimitqueue // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitqueue"
+package ratelimitqueue // import "github.com/faustbrian/go-rate-limit/ratelimitqueue"
 
 Package ratelimitqueue provides queue admission middleware that returns a typed
 deferral without acknowledging, sleeping, or changing retry ownership.
@@ -686,9 +686,9 @@ func ByPrincipal() SubjectFunc
 func ByQueueAndTenant() SubjectFunc
     ByQueueAndTenant derives an unambiguous composite subject.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimitrpc
+PACKAGE github.com/faustbrian/go-rate-limit/ratelimitrpc
 
-package ratelimitrpc // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimitrpc"
+package ratelimitrpc // import "github.com/faustbrian/go-rate-limit/ratelimitrpc"
 
 Package ratelimitrpc provides transport-neutral JSON-RPC admission middleware
 for global, principal, method, tenant, and custom subjects.
@@ -791,9 +791,9 @@ func Principal() SubjectFunc
 func Tenant() SubjectFunc
     Tenant returns a subject function using Call.Tenant.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/ratelimittelemetry
+PACKAGE github.com/faustbrian/go-rate-limit/ratelimittelemetry
 
-package ratelimittelemetry // import "github.com/faustbrian/golib/pkg/rate-limit/ratelimittelemetry"
+package ratelimittelemetry // import "github.com/faustbrian/go-rate-limit/ratelimittelemetry"
 
 Package ratelimittelemetry adapts bounded observations to OpenTelemetry metrics
 without using attacker-controlled values as unbounded labels.
@@ -817,9 +817,9 @@ type Options struct {
 }
     Options configures OpenTelemetry metric instruments.
 
-PACKAGE github.com/faustbrian/golib/pkg/rate-limit/valkey
+PACKAGE github.com/faustbrian/go-rate-limit/valkey
 
-package valkey // import "github.com/faustbrian/golib/pkg/rate-limit/valkey"
+package valkey // import "github.com/faustbrian/go-rate-limit/valkey"
 
 Package valkey provides atomic distributed admission backed by native Valkey.
 Keys use one opaque hash tag, scripts are versioned, and state has bounded TTL.

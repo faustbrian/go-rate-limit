@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
-	"github.com/faustbrian/golib/pkg/rate-limit/postgres"
-	"github.com/faustbrian/golib/pkg/rate-limit/ratelimittest"
+	ratelimit "github.com/faustbrian/go-rate-limit"
+	"github.com/faustbrian/go-rate-limit/postgres"
+	"github.com/faustbrian/go-rate-limit/ratelimittest"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

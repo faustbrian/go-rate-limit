@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/faustbrian/golib/pkg/rate-limit/memory"
-	"github.com/faustbrian/golib/pkg/rate-limit/ratelimittest"
+	"github.com/faustbrian/go-rate-limit/memory"
+	"github.com/faustbrian/go-rate-limit/ratelimittest"
 )
 
 func TestMemoryMatchesReferenceModels(t *testing.T) {

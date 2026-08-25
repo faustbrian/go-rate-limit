@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 )
 
 // Reference is a mutex-protected rational-arithmetic algorithm model.

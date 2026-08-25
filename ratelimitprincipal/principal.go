@@ -3,7 +3,7 @@ package ratelimitprincipal
 import (
 	"fmt"
 
-	ratelimit "github.com/faustbrian/golib/pkg/rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit"
 )
 
 // Principal is the narrow identity contract required for key derivation.
