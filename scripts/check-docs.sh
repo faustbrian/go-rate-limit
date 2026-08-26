@@ -7,11 +7,9 @@ SECURITY.md
 docs/README.md
 docs/api.md
 docs/algorithms.md
-docs/audit-report.md
 docs/backends.md
 docs/deployment.md
 docs/faq.md
-docs/hardening.md
 docs/http.md
 docs/json-rpc.md
 docs/laravel-migration.md
