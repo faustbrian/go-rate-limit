@@ -1,5 +1,3 @@
-PACKAGE github.com/faustbrian/go-rate-limit
-
 package ratelimit // import "github.com/faustbrian/go-rate-limit"
 
 Package ratelimit defines transport-neutral admission policies, requests,
@@ -358,8 +356,6 @@ type Subject struct {
 }
     Subject is a typed identity input used only to derive a bounded Key.
 
-PACKAGE github.com/faustbrian/go-rate-limit/memory
-
 package memory // import "github.com/faustbrian/go-rate-limit/memory"
 
 Package memory provides bounded, sharded, process-local admission state.
@@ -412,8 +408,6 @@ func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
 
 func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error)
     Sweep removes idle keys and expired leases, returning the keys removed.
-
-PACKAGE github.com/faustbrian/go-rate-limit/postgres
 
 package postgres // import "github.com/faustbrian/go-rate-limit/postgres"
 
@@ -499,8 +493,6 @@ func (store *Store) Name() string
 func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error
     Release transactionally verifies and relinquishes an owned lease.
 
-PACKAGE github.com/faustbrian/go-rate-limit/ratelimithttp
-
 package ratelimithttp // import "github.com/faustbrian/go-rate-limit/ratelimithttp"
 
 Package ratelimithttp provides net/http inbound admission middleware and strict
@@ -561,8 +553,6 @@ type Options struct {
 }
     Options configures inbound HTTP admission.
 
-PACKAGE github.com/faustbrian/go-rate-limit/ratelimitlog
-
 package ratelimitlog // import "github.com/faustbrian/go-rate-limit/ratelimitlog"
 
 Package ratelimitlog adapts bounded observations to structured slog records.
@@ -588,8 +578,6 @@ type Options struct {
 }
     Options configures structured observation logging.
 
-PACKAGE github.com/faustbrian/go-rate-limit/ratelimitprincipal
-
 package ratelimitprincipal // import "github.com/faustbrian/go-rate-limit/ratelimitprincipal"
 
 Package ratelimitprincipal adapts authentication principals to hashed admission
@@ -608,8 +596,6 @@ type Principal interface {
 	Subject() string
 }
     Principal is the narrow identity contract required for key derivation.
-
-PACKAGE github.com/faustbrian/go-rate-limit/ratelimitqueue
 
 package ratelimitqueue // import "github.com/faustbrian/go-rate-limit/ratelimitqueue"
 
@@ -685,8 +671,6 @@ func ByPrincipal() SubjectFunc
 
 func ByQueueAndTenant() SubjectFunc
     ByQueueAndTenant derives an unambiguous composite subject.
-
-PACKAGE github.com/faustbrian/go-rate-limit/ratelimitrpc
 
 package ratelimitrpc // import "github.com/faustbrian/go-rate-limit/ratelimitrpc"
 
@@ -791,8 +775,6 @@ func Principal() SubjectFunc
 func Tenant() SubjectFunc
     Tenant returns a subject function using Call.Tenant.
 
-PACKAGE github.com/faustbrian/go-rate-limit/ratelimittelemetry
-
 package ratelimittelemetry // import "github.com/faustbrian/go-rate-limit/ratelimittelemetry"
 
 Package ratelimittelemetry adapts bounded observations to OpenTelemetry metrics
@@ -816,8 +798,6 @@ type Options struct {
 	MeterProvider metric.MeterProvider
 }
     Options configures OpenTelemetry metric instruments.
-
-PACKAGE github.com/faustbrian/go-rate-limit/valkey
 
 package valkey // import "github.com/faustbrian/go-rate-limit/valkey"
 
