@@ -17,5 +17,3 @@
 - [Performance guide](performance.md)
 - [Troubleshooting](troubleshooting.md)
 - [FAQ](faq.md)
-- [Hardening evidence](hardening.md)
-- [Hardening audit report](audit-report.md)
