@@ -16,14 +16,14 @@ type leaseBackend struct {
 
 func (backend *leaseBackend) Acquire(_ context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error) {
 	return ratelimit.Lease{
-			ID: request.LeaseID, Key: request.Request.Key,
-			PolicyID: request.Request.Policy.ID(), Cost: request.Request.Cost,
-			ExpiresAt: request.Request.Now.Add(time.Second), Backend: backend.Name(),
-		}, ratelimit.Decision{
-			Allowed: true, Limit: request.Request.Policy.Limit(),
-			Remaining: request.Request.Policy.Limit() - request.Request.Cost,
-			Reason:    ratelimit.ReasonAllowed,
-		}, nil
+		ID: request.LeaseID, Key: request.Request.Key,
+		PolicyID: request.Request.Policy.ID(), Cost: request.Request.Cost,
+		ExpiresAt: request.Request.Now.Add(time.Second), Backend: backend.Name(),
+	}, ratelimit.Decision{
+		Allowed: true, Limit: request.Request.Policy.Limit(),
+		Remaining: request.Request.Policy.Limit() - request.Request.Cost,
+		Reason:    ratelimit.ReasonAllowed,
+	}, nil
 }
 
 func (backend *leaseBackend) Release(_ context.Context, lease ratelimit.Lease) error {
