@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-rate-limit",
+  "module": ".",
+  "package": "ratelimithttp",
+  "gate": "mutation",
+  "input_digest": "sha256:30e854875ca99b9f3172d84a8e117e73657b37a7549b5a1018deec593b34e733",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:51601bc78c727f89da0194dfdb37a8219d1fd3b28aa8ce2ee78077dac76bd045",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.27.0",
+    "gremlins_binary_sha256": "sha256:6a2beddc477eb410f8a670b6c9049558563d3c4327498fe31604d31c773a959e"
+  },
+  "completed_at": "2026-08-30T01:18:37.734774Z"
+}
