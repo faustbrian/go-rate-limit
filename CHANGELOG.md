@@ -12,15 +12,17 @@ versioning after v1.0.0.
 - Replace copied repository tooling with the checksum-pinned
   `go-library-tools` v1.0.13 contract while retaining package-owned policy and
   verification evidence.
-- Adopt the checksum-verified `go-library-tools` v1.3.0 CLI, schema-v2 cohesion
-  metadata, and repository-local cohesion gate while retaining package-owned
-  source and evidence.
+- Adopt the checksum-verified `go-library-tools` v1.4.0 CLI, schema-v2 cohesion
+  metadata, repository-local cohesion gate, and immutable W14-enforcement
+  workflow while retaining package-owned source and evidence.
+- Reconcile the `go-migrations` dependency with the checksum published by the
+  Go checksum database for its immutable v1.0.0 commit.
 
 ### Documentation
 
 - Replace archived monorepo links and completed execution artifacts with a
   standalone, human-oriented documentation structure.
-- Link the module to the immutable v1.3.0 Golib ecosystem index and resilience
+- Link the module to the immutable v1.4.0 Golib ecosystem index and resilience
   family guidance.
 
 ## 1.0.0 - 2026-08-25

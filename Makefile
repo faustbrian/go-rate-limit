@@ -7,6 +7,7 @@ check:
 
 ci:
 	$(GOLIB) repository check
+	$(GOLIB) cohesion check
 	$(GOLIB) check --all
 
 cohesion:
