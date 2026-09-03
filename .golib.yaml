@@ -1,75 +1,80 @@
 schema_version: 1
-tool_version: v1.0.14
-tool_checksums_sha256: 88341d2f2904925b22ec8de084fec68c5229669f1119f066ed5fccd76aee2f82
+tool_version: v1.4.0
+tool_checksums_sha256: ba1b71d41dc9b58d5bfb411bc89ae2d45b6f3f778152714bfd1afeab0bef2f33
+
 manifest:
   modules: modules.json
   packages: packages.json
+
 evidence:
-  root: ".verification"
+  root: .verification
+
 mutation:
-  root: ".verification/mutation"
+  root: .verification/mutation
   imports:
-  - module: "."
-    archive: ".verification/mutation/bootstrap/root.zip"
-    ledger: ".verification/mutation/migration-ledger.json"
+    - module: .
+      archive: .verification/mutation/bootstrap/root.zip
+      ledger: .verification/mutation/migration-ledger.json
+
 api:
   baselines:
-  - module: "."
-    mode: go-doc
-    path: api/baseline.txt
-    packages:
-    - "."
-    - "./memory"
-    - "./postgres"
-    - "./ratelimithttp"
-    - "./ratelimitlog"
-    - "./ratelimitprincipal"
-    - "./ratelimitqueue"
-    - "./ratelimitrpc"
-    - "./ratelimittelemetry"
-    - "./valkey"
+    - module: .
+      mode: go-doc
+      path: api/baseline.txt
+      packages:
+        - .
+        - ./memory
+        - ./postgres
+        - ./ratelimithttp
+        - ./ratelimitlog
+        - ./ratelimitprincipal
+        - ./ratelimitqueue
+        - ./ratelimitrpc
+        - ./ratelimittelemetry
+        - ./valkey
+
 operations:
-- module: "."
-  gate: docs
-  steps:
-  - type: make
-    makefile: verification/package.mk
-    target: docs
-    timeout: 20m
-- module: "."
-  gate: test
-  steps:
-  - type: make
-    makefile: verification/package.mk
-    target: integration
-    timeout: 20m
-- module: "."
-  gate: fuzz
-  steps:
-  - type: go-test
-    packages: ["."]
-    fuzz: '^FuzzNewKeyNeverLeaksHashedSubject$'
-    budget: 100x
-    timeout: 2m
-  - type: go-test
-    packages: ["./postgres"]
-    fuzz: '^FuzzDecodeStateNeverPanics$'
-    budget: 100x
-    timeout: 2m
-  - type: go-test
-    packages: ["./ratelimithttp"]
-    fuzz: '^FuzzTrustedProxyChainNeverPanics$'
-    budget: 100x
-    timeout: 2m
-  - type: go-test
-    packages: ["./valkey"]
-    fuzz: '^FuzzDecodeDecisionNeverPanics$'
-    budget: 100x
-    timeout: 2m
-- module: "."
-  gate: benchmark
-  steps:
-  - type: make
-    makefile: verification/package.mk
-    target: benchmark
-    timeout: 20m
+  - module: .
+    gate: docs
+    steps:
+      - type: make
+        makefile: verification/package.mk
+        target: docs
+        timeout: 20m
+  - module: .
+    gate: test
+    steps:
+      - type: make
+        makefile: verification/package.mk
+        target: integration
+        timeout: 20m
+  - module: .
+    gate: fuzz
+    steps:
+      - type: go-test
+        packages: [.]
+        fuzz: '^FuzzNewKeyNeverLeaksHashedSubject$'
+        budget: 100x
+        timeout: 2m
+      - type: go-test
+        packages: [./postgres]
+        fuzz: '^FuzzDecodeStateNeverPanics$'
+        budget: 100x
+        timeout: 2m
+      - type: go-test
+        packages: [./ratelimithttp]
+        fuzz: '^FuzzTrustedProxyChainNeverPanics$'
+        budget: 100x
+        timeout: 2m
+      - type: go-test
+        packages: [./valkey]
+        fuzz: '^FuzzDecodeDecisionNeverPanics$'
+        budget: 100x
+        timeout: 2m
+  - module: .
+    gate: benchmark
+    steps:
+      - type: make
+        makefile: verification/package.mk
+        target: benchmark
+        timeout: 20m

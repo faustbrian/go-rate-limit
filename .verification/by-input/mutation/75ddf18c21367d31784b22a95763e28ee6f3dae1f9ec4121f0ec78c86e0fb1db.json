@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-rate-limit",
+  "module": ".",
+  "package": "ratelimittelemetry",
+  "gate": "mutation",
+  "input_digest": "sha256:75ddf18c21367d31784b22a95763e28ee6f3dae1f9ec4121f0ec78c86e0fb1db",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:7c281177ea5860c87722096bd0fdbeb59be26d7d522c6f1cd48eb12b702082b5",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.27.0",
+    "gremlins_binary_sha256": "sha256:6a2beddc477eb410f8a670b6c9049558563d3c4327498fe31604d31c773a959e"
+  },
+  "completed_at": "2026-08-30T01:19:57.291712Z"
+}

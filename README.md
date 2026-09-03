@@ -86,9 +86,14 @@ Start at [docs/README.md](docs/README.md). The API and adoption guides cover
 algorithms, consistency, failure behavior, transports, migrations, operations,
 security, performance, and troubleshooting.
 
+See the versioned [Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/README.md)
+and [resilience package-family guidance](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/design-language.md#package-families-and-selection)
+for the shared design language this module follows.
+
 ## Local verification
 
     make unit
+    make cohesion
     make check
 
 Exact production coverage and live integration need disposable services:

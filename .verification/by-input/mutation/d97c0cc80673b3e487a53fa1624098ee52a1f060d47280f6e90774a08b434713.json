@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-rate-limit",
+  "module": ".",
+  "package": "valkey",
+  "gate": "mutation",
+  "input_digest": "sha256:d97c0cc80673b3e487a53fa1624098ee52a1f060d47280f6e90774a08b434713",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:ccbfe15294b8e2fcd116d18d8c080c045b1ea4f3a97ac8982b244bf92544df87",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.27.0",
+    "gremlins_binary_sha256": "sha256:6a2beddc477eb410f8a670b6c9049558563d3c4327498fe31604d31c773a959e"
+  },
+  "completed_at": "2026-08-30T01:21:02.266703Z"
+}
