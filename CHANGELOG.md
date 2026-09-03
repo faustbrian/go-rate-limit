@@ -7,14 +7,21 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Replace copied repository tooling with the pinned `go-library-tools` v1.0.5
+  contract while retaining package-owned policy and verification evidence.
 - Replace copied repository tooling with the checksum-pinned
   `go-library-tools` v1.0.13 contract while retaining package-owned policy and
   verification evidence.
+- Adopt the checksum-verified `go-library-tools` v1.3.0 CLI, schema-v2 cohesion
+  metadata, and repository-local cohesion gate while retaining package-owned
+  source and evidence.
 
 ### Documentation
 
 - Replace archived monorepo links and completed execution artifacts with a
   standalone, human-oriented documentation structure.
+- Link the module to the immutable v1.3.0 Golib ecosystem index and resilience
+  family guidance.
 
 ## 1.0.0 - 2026-08-25
 

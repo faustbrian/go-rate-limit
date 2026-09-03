@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "repository": "github.com/faustbrian/go-rate-limit",
   "go_version": "1.26.6",
   "modules": [
@@ -149,6 +149,107 @@
       "family_label": "Resilience",
       "family_description": "Explicit admission, isolation, retry, amplification, and failure policies.",
       "family_order": 5,
+      "cohesion": {
+        "family": "resilience",
+        "secondary_capabilities": [
+          "database-and-storage",
+          "http-and-service-edge",
+          "observability"
+        ],
+        "responsibility": "Provide transport-neutral inbound admission policies, bounded memory and distributed backends, concurrency leases, and explicit HTTP, RPC, queue, principal, logging, and telemetry integrations.",
+        "non_goals": [
+          "Own authorization, billing quotas, WAF rules, queue acknowledgement, outbound retries, or HTTP transport pacing."
+        ],
+        "public_package_identifier": "ratelimit",
+        "primary_entry_packages": [
+          "github.com/faustbrian/go-rate-limit"
+        ],
+        "package_selection": {
+          "github.com/faustbrian/go-rate-limit": "Use for immutable admission policies, typed decisions and errors, service orchestration, batches, and concurrency-lease contracts.",
+          "github.com/faustbrian/go-rate-limit/memory": "Use for bounded process-local admission state when limits do not need cross-replica authority.",
+          "github.com/faustbrian/go-rate-limit/postgres": "Use for transactional PostgreSQL-backed admission, concurrency leases, cleanup, and migration ownership.",
+          "github.com/faustbrian/go-rate-limit/ratelimithttp": "Use for net/http inbound admission middleware and trusted-proxy client identity extraction.",
+          "github.com/faustbrian/go-rate-limit/ratelimitlog": "Use to adapt bounded admission observations to caller-owned slog logging.",
+          "github.com/faustbrian/go-rate-limit/ratelimitprincipal": "Use to derive bounded hashed rate-limit subjects from authentication principals.",
+          "github.com/faustbrian/go-rate-limit/ratelimitqueue": "Use for queue admission middleware without changing acknowledgement or retry ownership.",
+          "github.com/faustbrian/go-rate-limit/ratelimitrpc": "Use for transport-neutral JSON-RPC admission middleware.",
+          "github.com/faustbrian/go-rate-limit/ratelimittelemetry": "Use to adapt bounded admission observations to caller-owned OpenTelemetry meters.",
+          "github.com/faustbrian/go-rate-limit/ratelimittest": "Use in tests for deterministic clocks, reference models, and backend conformance.",
+          "github.com/faustbrian/go-rate-limit/valkey": "Use for atomic distributed admission and concurrency leases backed by Valkey."
+        },
+        "lifecycle_status": "active",
+        "maturity": "stable",
+        "construction_styles": [
+          "new-options",
+          "open",
+          "validated-value"
+        ],
+        "lifecycle_styles": [
+          "close",
+          "stateless"
+        ],
+        "ownership": {
+          "configuration": "caller",
+          "mutable_inputs": [
+            "borrow",
+            "copy"
+          ],
+          "runtime_resources": "shared",
+          "background_work": "none"
+        },
+        "optional_owned_dependencies": [],
+        "adapters": [
+          "github.com/faustbrian/go-rate-limit/ratelimithttp",
+          "github.com/faustbrian/go-rate-limit/ratelimitlog",
+          "github.com/faustbrian/go-rate-limit/ratelimitprincipal",
+          "github.com/faustbrian/go-rate-limit/ratelimitqueue",
+          "github.com/faustbrian/go-rate-limit/ratelimitrpc",
+          "github.com/faustbrian/go-rate-limit/ratelimittelemetry"
+        ],
+        "companions": [
+          "github.com/faustbrian/go-rate-limit/memory",
+          "github.com/faustbrian/go-rate-limit/postgres",
+          "github.com/faustbrian/go-rate-limit/ratelimittest",
+          "github.com/faustbrian/go-rate-limit/valkey"
+        ],
+        "supported_go": {
+          "minimum": "1.26.6",
+          "tested": [
+            "1.26.6"
+          ]
+        },
+        "supported_platforms": [
+          "portable-go"
+        ],
+        "supported_backends": [
+          "memory",
+          "postgresql",
+          "valkey"
+        ],
+        "supported_protocols": [
+          "http",
+          "json-rpc"
+        ],
+        "documentation": {
+          "readme": "README.md",
+          "api": "docs/api.md",
+          "adoption": "docs/deployment.md",
+          "security": "docs/security.md",
+          "compatibility": "docs/backends.md",
+          "performance": "docs/performance.md",
+          "examples": null,
+          "faq": "docs/faq.md",
+          "changelog": "CHANGELOG.md",
+          "pkg_go_dev": "https://pkg.go.dev/github.com/faustbrian/go-rate-limit",
+          "ecosystem_index": "https://github.com/faustbrian/go-library-tools/blob/v1.3.0/docs/ecosystem/README.md"
+        },
+        "known_good_compatibility_sets": [],
+        "delivery": {
+          "implementation": "not-started",
+          "hardening": "not-started",
+          "release": "not-started"
+        }
+      },
       "version": "1.0.0",
       "tag_prefix": "v",
       "owned_dependencies": [
