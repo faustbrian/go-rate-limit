@@ -16,6 +16,11 @@ does not retry or sleep because retrying an unknown distributed result can
 double-consume capacity. Transport owners decide whether an operation is safe
 to repeat.
 
+Strict backends distinguish a canceled operation known not to have dispatched
+from an operation whose outcome cannot be established. Callers must test
+ErrOutcomeUnknown before ErrCanceled and ErrDeadline, then reconcile backend
+state or use separately proven idempotency before retrying.
+
 Concurrency acquisition is the exception only for the same LeaseID, key,
 policy ID, and Cost: that exact retry is idempotent. Reusing the ID with a
 different Cost is rejected as non-owned rather than consuming or rewriting

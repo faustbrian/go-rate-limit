@@ -30,7 +30,7 @@ const (
 type Options struct {
 	// Prefix namespaces keys and must contain no spaces or hash-tag characters.
 	Prefix string
-	// Timeout bounds each server-side operation.
+	// Timeout bounds each admission and lease operation; checks use the caller context.
 	Timeout time.Duration
 	// Clock selects client or server time.
 	Clock ClockPolicy

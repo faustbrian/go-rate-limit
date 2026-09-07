@@ -44,3 +44,16 @@ func TestObserverRecordsBoundedDecisionMetrics(t *testing.T) {
 		}
 	}
 }
+
+func TestObserverNilAndZeroReceiversRetainLegacyPanic(t *testing.T) {
+	for _, observer := range []*ratelimittelemetry.Observer{nil, new(ratelimittelemetry.Observer)} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("legacy Observe() did not panic")
+				}
+			}()
+			observer.Observe(ratelimit.Observation{})
+		}()
+	}
+}

@@ -12,9 +12,12 @@ import (
 )
 
 var (
-	nativeAdmitScript   = valkeygo.NewLuaScript(admitScript)
-	nativeAcquireScript = valkeygo.NewLuaScript(acquireLeaseScript)
-	nativeReleaseScript = valkeygo.NewLuaScript(releaseLeaseScript)
+	nativeAdmitScript         = valkeygo.NewLuaScript(admitScript)
+	nativeStrictAdmitScript   = valkeygo.NewLuaScript(strictAdmitScript)
+	nativeAcquireScript       = valkeygo.NewLuaScript(acquireLeaseScript)
+	nativeStrictAcquireScript = valkeygo.NewLuaScript(strictAcquireLeaseScript)
+	nativeReleaseScript       = valkeygo.NewLuaScript(releaseLeaseScript)
+	nativeStrictReleaseScript = valkeygo.NewLuaScript(strictReleaseLeaseScript)
 )
 
 type nativeExecutor struct {
@@ -88,15 +91,27 @@ func (store *Store) Check(ctx context.Context) error {
 }
 
 func (executor *nativeExecutor) exec(ctx context.Context, keys, args []string) ([]string, error) {
-	return executeScript(ctx, executor.client, nativeAdmitScript, keys, args)
+	script := nativeAdmitScript
+	if len(args) == 12 && args[11] == "strict" {
+		script = nativeStrictAdmitScript
+	}
+	return executeScript(ctx, executor.client, script, keys, args)
 }
 
 func (executor *nativeExecutor) acquire(ctx context.Context, keys, args []string) ([]string, error) {
-	return executeScript(ctx, executor.client, nativeAcquireScript, keys, args)
+	script := nativeAcquireScript
+	if len(args) == 11 && args[10] == "strict" {
+		script = nativeStrictAcquireScript
+	}
+	return executeScript(ctx, executor.client, script, keys, args)
 }
 
 func (executor *nativeExecutor) release(ctx context.Context, keys, args []string) ([]string, error) {
-	return executeScript(ctx, executor.client, nativeReleaseScript, keys, args)
+	script := nativeReleaseScript
+	if len(args) == 6 && args[5] == "strict" {
+		script = nativeStrictReleaseScript
+	}
+	return executeScript(ctx, executor.client, script, keys, args)
 }
 
 func executeScript(ctx context.Context, client valkeygo.Client, script *valkeygo.Lua, keys, args []string) ([]string, error) {

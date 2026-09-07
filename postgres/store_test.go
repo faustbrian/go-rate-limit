@@ -22,11 +22,13 @@ type fakeExecutor struct {
 
 type fakeLeaseExecutor struct {
 	*fakeExecutor
+	lease    ratelimit.Lease
+	decision ratelimit.Decision
 	leaseErr error
 }
 
 func (executor *fakeLeaseExecutor) acquire(context.Context, []byte, ratelimit.LeaseRequest, string) (ratelimit.Lease, ratelimit.Decision, error) {
-	return ratelimit.Lease{}, ratelimit.Decision{}, executor.leaseErr
+	return executor.lease, executor.decision, executor.leaseErr
 }
 
 func (executor *fakeLeaseExecutor) release(context.Context, []byte, ratelimit.Lease, string) error {

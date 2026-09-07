@@ -12,6 +12,8 @@
 - [Weighted costs](weighted-costs.md)
 - [Deployment and policy revisions](deployment.md)
 - [Laravel migration](laravel-migration.md)
+- [Strict API and adapter migration](strict-migration.md)
+- [Compatibility and residuals](compatibility.md)
 - [Operations runbook](operations.md)
 - [Security model](security.md)
 - [Performance guide](performance.md)

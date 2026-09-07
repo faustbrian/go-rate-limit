@@ -104,7 +104,7 @@ func (executor *nativeExecutor) acquire(ctx context.Context, key []byte, request
 	if err != nil {
 		return ratelimit.Lease{}, ratelimit.Decision{}, err
 	}
-	next, lease, decision, resultErr := mutateLease(current, request, digest)
+	next, lease, decision, resultErr := mutateLeaseLegacy(current, request, digest)
 	if resultErr != nil {
 		if !errors.Is(resultErr, ratelimit.ErrRejected) {
 			return ratelimit.Lease{}, ratelimit.Decision{}, resultErr
@@ -199,6 +199,23 @@ func loadStateForRelease(ctx context.Context, tx nativeTransaction, key []byte) 
 	}
 	if err != nil {
 		return nil, err
+	}
+	return decodeStateLegacy(encoded)
+}
+
+func loadStateForReleaseStrict(ctx context.Context, tx nativeTransaction, key []byte) (*persistedState, error) {
+	var encoded []byte
+	var expiresAt time.Time
+	var withinLimit bool
+	err := tx.queryRow(ctx, selectStateStrictSQL, key, maxEncodedStateBytes).Scan(&encoded, &expiresAt, &withinLimit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !withinLimit {
+		return nil, ratelimit.ErrCorrupt
 	}
 	return decodeState(encoded)
 }

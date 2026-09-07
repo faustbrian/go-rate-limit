@@ -12,10 +12,15 @@ Decreasing concurrency capacity below active leased cost reports zero
 remaining and rejects new leases until enough ownership expires or is
 released; unsigned underflow cannot reopen capacity.
 
-An exact retry from an older process revision remains idempotent and reports
-remaining capacity clamped to zero when the newer limit is lower. Reusing a
-LeaseID with a different Cost returns ErrLeaseNotOwned and never rewrites the
-stored lease proof.
+Revision values are opaque identifiers, not an ordered generation. Drain old
+policy revisions before activating a same-ID revision; mixed old/new writers
+cannot determine which opaque revision is authoritative. Period or window-shape
+changes require a new Policy.ID (or a complete drain until prior state expires)
+because stored window indexes cannot be reinterpreted safely. Strict backends
+record the established fixed/sliding period and return ErrCorrupt on a same-ID
+period mismatch without mutating state. Reusing a LeaseID
+with a different Cost returns ErrLeaseNotOwned and never rewrites the stored
+lease proof.
 
 Deploy algorithm changes under a new Policy.ID. Reusing an ID with a different
 algorithm is corruption and fails closed. Deploy key-derivation changes under

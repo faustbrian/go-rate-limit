@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,13 +40,22 @@ func TestStoreLeaseErrorClassificationsAreIndependent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	executor.lease = postgresLease(request, request.Request.Now.Add(time.Second))
+	executor.decision = ratelimit.Decision{Allowed: true, Limit: 2, Remaining: 1, Reset: executor.lease.ExpiresAt, Reason: ratelimit.ReasonAllowed}
+	lease, decision, err := store.Acquire(context.Background(), request)
+	if err != nil || lease != executor.lease || decision != executor.decision {
+		t.Fatalf("Acquire(success) = %+v, %+v, %v", lease, decision, err)
+	}
+	if err := store.Release(context.Background(), lease); err != nil {
+		t.Fatalf("Release(success) error = %v", err)
+	}
 	for _, classified := range []error{ratelimit.ErrRejected, ratelimit.ErrLeaseNotOwned} {
 		executor.leaseErr = classified
 		if _, _, err := store.Acquire(context.Background(), request); !errors.Is(err, classified) {
 			t.Fatalf("Acquire(%v) error = %v", classified, err)
 		}
 	}
-	lease := postgresLease(request, request.Request.Now.Add(time.Second))
+	lease = postgresLease(request, request.Request.Now.Add(time.Second))
 	for _, classified := range []error{ratelimit.ErrLeaseNotFound, ratelimit.ErrLeaseNotOwned} {
 		executor.leaseErr = classified
 		if err := store.Release(context.Background(), lease); !errors.Is(err, classified) {
@@ -95,42 +105,226 @@ func TestPersistedLeaseIdentityAndBudgetBoundaries(t *testing.T) {
 		}
 	}
 	expires := request.Request.Now.Add(time.Second).UnixMicro()
+	existing := *valid
+	digest := strings.Repeat("a", 64)
+	existing.Leases = map[string]persistedLease{digest: {Cost: 2, ExpiresMicros: expires}}
+	returned, lease, decision, err := mutateLease(&existing, request, digest)
+	if returned != &existing || lease != (ratelimit.Lease{}) || decision != (ratelimit.Decision{}) ||
+		!errors.Is(err, ratelimit.ErrLeaseNotOwned) {
+		t.Fatalf("mutateLease(existing cost mismatch) = %+v, %+v, %+v, %v", returned, lease, decision, err)
+	}
 	for _, leases := range []map[string]persistedLease{
-		{"zero": {Cost: 0, ExpiresMicros: expires}},
-		{"large": {Cost: ratelimit.MaxConcurrencyLeases + 1, ExpiresMicros: expires}},
+		{strings.Repeat("a", 64): {Cost: 0, ExpiresMicros: expires}},
+		{strings.Repeat("a", 64): {Cost: ratelimit.MaxConcurrencyLeases + 1, ExpiresMicros: expires}},
 		{
-			"full":  {Cost: ratelimit.MaxConcurrencyLeases, ExpiresMicros: expires},
-			"extra": {Cost: 1, ExpiresMicros: expires},
+			strings.Repeat("a", 64): {Cost: ratelimit.MaxConcurrencyLeases, ExpiresMicros: expires},
+			strings.Repeat("b", 64): {Cost: 1, ExpiresMicros: expires},
+		},
+		{
+			strings.Repeat("a", 64): {Cost: 400, ExpiresMicros: expires},
+			strings.Repeat("b", 64): {Cost: 400, ExpiresMicros: expires},
+			strings.Repeat("c", 64): {Cost: 400, ExpiresMicros: expires},
 		},
 	} {
 		state := *valid
 		state.Leases = leases
-		if _, _, _, err := mutateLease(&state, request, "new"); !errors.Is(err, ratelimit.ErrCorrupt) {
+		if _, _, _, err := mutateLease(&state, request, strings.Repeat("f", 64)); !errors.Is(err, ratelimit.ErrCorrupt) {
 			t.Fatalf("mutateLease(invalid budget) error = %v", err)
 		}
 	}
 	for _, leases := range []map[string]persistedLease{
-		{"full": {Cost: ratelimit.MaxConcurrencyLeases, ExpiresMicros: expires}},
+		{strings.Repeat("a", 64): {Cost: ratelimit.MaxConcurrencyLeases, ExpiresMicros: expires}},
 		{
-			"almost": {Cost: ratelimit.MaxConcurrencyLeases - 1, ExpiresMicros: expires},
-			"last":   {Cost: 1, ExpiresMicros: expires},
+			strings.Repeat("a", 64): {Cost: ratelimit.MaxConcurrencyLeases - 1, ExpiresMicros: expires},
+			strings.Repeat("b", 64): {Cost: 1, ExpiresMicros: expires},
 		},
 	} {
 		state := *valid
 		state.Leases = leases
-		if _, _, _, err := mutateLease(&state, request, "new"); !errors.Is(err, ratelimit.ErrRejected) {
+		if _, _, _, err := mutateLease(&state, request, strings.Repeat("f", 64)); !errors.Is(err, ratelimit.ErrRejected) {
 			t.Fatalf("mutateLease(exact budget) error = %v", err)
 		}
 	}
 	state := *valid
 	state.Leases = map[string]persistedLease{
-		"late":  {Cost: 1, ExpiresMicros: expires + 10},
-		"early": {Cost: 1, ExpiresMicros: expires},
+		strings.Repeat("a", 64): {Cost: 1, ExpiresMicros: expires + 10},
+		strings.Repeat("b", 64): {Cost: 1, ExpiresMicros: expires},
 	}
 	request.Request.Cost = 1
-	_, _, decision, err := mutateLease(&state, request, "new")
+	_, _, decision, err = mutateLease(&state, request, strings.Repeat("f", 64))
 	if !errors.Is(err, ratelimit.ErrRejected) || decision.Reset.UnixMicro() != expires {
 		t.Fatalf("mutateLease(earliest) = %+v, %v", decision, err)
+	}
+}
+
+func TestLegacyLeaseMutationRetainsReleasedIdentityAndBudgetChecks(t *testing.T) {
+	t.Parallel()
+
+	request := concurrencyLeaseRequest(t, time.Unix(100, 0), "new", 1)
+	expires := request.Request.Now.Add(time.Second).UnixMicro()
+	base := persistedState{
+		Schema: stateSchema, PolicyID: request.Request.Policy.ID(), Algorithm: ratelimit.Concurrency,
+	}
+	for _, state := range []*persistedState{
+		{Schema: stateSchema + 1, PolicyID: base.PolicyID, Algorithm: base.Algorithm},
+		{Schema: stateSchema, PolicyID: "other", Algorithm: base.Algorithm},
+		{Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: ratelimit.FixedWindow},
+		{Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm, Leases: map[string]persistedLease{"zero": {Cost: 0, ExpiresMicros: expires}}},
+		{Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm, Leases: map[string]persistedLease{"large": {Cost: ratelimit.MaxConcurrencyLeases + 1, ExpiresMicros: expires}}},
+		{Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm, Leases: map[string]persistedLease{
+			"full":  {Cost: ratelimit.MaxConcurrencyLeases, ExpiresMicros: expires},
+			"extra": {Cost: 1, ExpiresMicros: expires},
+		}},
+	} {
+		if _, _, _, err := mutateLeaseLegacy(state, request, "new"); !errors.Is(err, ratelimit.ErrCorrupt) {
+			t.Fatalf("mutateLeaseLegacy(%+v) error = %v", state, err)
+		}
+	}
+
+	valid := &persistedState{
+		Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm,
+		ObservedMicros: request.Request.Now.UnixMicro(),
+		Leases: map[string]persistedLease{
+			strings.Repeat("a", 64): {Cost: ratelimit.MaxConcurrencyLeases - 1, ExpiresMicros: expires},
+			strings.Repeat("b", 64): {Cost: 1, ExpiresMicros: expires},
+		},
+	}
+	if err := validateConcurrencyState(valid, base.PolicyID); err != nil {
+		t.Fatalf("validateConcurrencyState(exact budget) error = %v", err)
+	}
+	invalid := *valid
+	invalid.Leases = map[string]persistedLease{
+		strings.Repeat("a", 64): {Cost: 400, ExpiresMicros: expires},
+		strings.Repeat("b", 64): {Cost: 400, ExpiresMicros: expires},
+		strings.Repeat("c", 64): {Cost: 400, ExpiresMicros: expires},
+	}
+	if err := validateConcurrencyState(&invalid, base.PolicyID); !errors.Is(err, ratelimit.ErrCorrupt) {
+		t.Fatalf("validateConcurrencyState(over budget) error = %v", err)
+	}
+	for _, state := range []*persistedState{
+		{Schema: stateSchema + 1, PolicyID: base.PolicyID, Algorithm: base.Algorithm},
+		{Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: ratelimit.FixedWindow},
+		{Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm, ObservedMicros: maxExactMicros + 1},
+		{
+			Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm,
+			ObservedMicros: request.Request.Now.UnixMicro(),
+			Leases: map[string]persistedLease{
+				strings.Repeat("g", 64): {Cost: 1, ExpiresMicros: expires},
+			},
+		},
+		{
+			Schema: stateSchema, PolicyID: base.PolicyID, Algorithm: base.Algorithm,
+			ObservedMicros: request.Request.Now.UnixMicro(),
+			Leases: map[string]persistedLease{
+				strings.Repeat("a", 64): {Cost: 1, ExpiresMicros: maxExactMicros + 1},
+			},
+		},
+	} {
+		if err := validateConcurrencyState(state, base.PolicyID); !errors.Is(err, ratelimit.ErrCorrupt) {
+			t.Fatalf("validateConcurrencyState(%+v) error = %v", state, err)
+		}
+	}
+}
+
+func TestLegacyStateMutationDoesNotApplyStrictOnlyValidation(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(100, 0).UTC()
+	for _, algorithm := range []ratelimit.Algorithm{ratelimit.TokenBucket, ratelimit.FixedWindow, ratelimit.SlidingWindow} {
+		policy := postgresPolicyForMutation(t, algorithm, 2, time.Minute)
+		request := postgresTokenRequest(t, now, 1)
+		request.Policy = policy
+		state := &persistedState{
+			Schema: stateSchema, PolicyID: policy.ID(), Revision: policy.Revision(), Algorithm: algorithm,
+			Tokens: 1, LastMicros: now.UnixMicro(), ObservedMicros: now.UnixMicro(),
+		}
+		switch algorithm {
+		case ratelimit.TokenBucket:
+			state.Remainder = uint64(policy.Period().Microseconds())
+		case ratelimit.FixedWindow:
+			state.Window = maxExactMicros + 1
+		case ratelimit.SlidingWindow:
+			state.Segments[0] = persistedSegment{Index: -maxExactMicros - 1, Used: 1}
+		case ratelimit.Concurrency:
+			t.Fatal("unexpected concurrency algorithm")
+		}
+		if next, _, err := mutateStateLegacy(state, request); next == nil || errors.Is(err, ratelimit.ErrCorrupt) {
+			t.Fatalf("mutateStateLegacy(%s) = %+v, %v", algorithm, next, err)
+		}
+	}
+
+	policy := postgresPolicyForMutation(t, ratelimit.FixedWindow, 2, time.Minute)
+	request := postgresTokenRequest(t, time.UnixMicro(-maxExactMicros-1), 1)
+	request.Policy = policy
+	if next, decision, err := mutateStateLegacy(nil, request); next == nil || !decision.Allowed || errors.Is(err, ratelimit.ErrOverflow) {
+		t.Fatalf("legacy fixed out-of-range time = %+v, %+v, %v", next, decision, err)
+	}
+}
+
+func TestLegacySlidingMutationPreservesSegmentAccumulation(t *testing.T) {
+	t.Parallel()
+
+	policy := postgresPolicyForMutation(t, ratelimit.SlidingWindow, 3, time.Second)
+	request := postgresTokenRequest(t, time.Unix(20, 0), 1)
+	request.Policy = policy
+	state := &persistedState{}
+	state.Segments[0] = persistedSegment{Index: 320, Used: 1}
+
+	decision, err := mutateSlidingLegacy(state, request)
+	if err != nil || !decision.Allowed || decision.Remaining != 1 ||
+		state.Segments[0] != (persistedSegment{Index: 320, Used: 2}) || state.Used != 2 {
+		t.Fatalf("mutateSlidingLegacy() = %+v, %+v, %v", state, decision, err)
+	}
+}
+
+func TestStrictStateLoadDeletesExpiredRows(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(100, 0).UTC()
+	state := &persistedState{
+		Schema: stateSchema, PolicyID: "expired", Revision: "v1", Algorithm: ratelimit.FixedWindow,
+	}
+	tx := &fakeTransaction{rows: []pgx.Row{rowFunc(func(destinations ...any) error {
+		*(destinations[0].(*[]byte)) = encodeState(state)
+		*(destinations[1].(*time.Time)) = now
+		return nil
+	})}}
+	loaded, err := loadStateStrict(context.Background(), tx, []byte("key"), now)
+	if err != nil || loaded != nil || len(tx.execQueries) != 1 || tx.execQueries[0] != deleteStateSQL {
+		t.Fatalf("loadStateStrict(expired) = %+v, %v, queries=%v", loaded, err, tx.execQueries)
+	}
+}
+
+func TestStrictStateLoadsBoundEncodedBytesBeforeScan(t *testing.T) {
+	t.Parallel()
+
+	if maxEncodedStateBytes != 131_072 {
+		t.Fatalf("maxEncodedStateBytes = %d, want 131072", maxEncodedStateBytes)
+	}
+	now := time.Unix(100, 0).UTC()
+	for _, test := range []struct {
+		name string
+		load func(context.Context, nativeTransaction, []byte, time.Time) (*persistedState, error)
+	}{
+		{name: "admit", load: loadStateStrict},
+		{name: "release", load: func(ctx context.Context, tx nativeTransaction, key []byte, _ time.Time) (*persistedState, error) {
+			return loadStateForReleaseStrict(ctx, tx, key)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stateRow := rowFunc(func(destinations ...any) error {
+				*(destinations[0].(*[]byte)) = []byte(`{}`)
+				*(destinations[1].(*time.Time)) = now.Add(time.Second)
+				return nil
+			})
+			tx := &fakeTransaction{rows: []pgx.Row{strictStateRow{row: stateRow, withinLimit: false}}}
+			if _, err := test.load(context.Background(), tx, []byte("key"), now); !errors.Is(err, ratelimit.ErrCorrupt) {
+				t.Fatalf("load error = %v", err)
+			}
+			if len(tx.queryArgs) != 1 || len(tx.queryArgs[0]) != 2 || tx.queryArgs[0][1] != maxEncodedStateBytes {
+				t.Fatalf("strict state query args = %#v", tx.queryArgs)
+			}
+		})
 	}
 }
 
@@ -235,6 +429,10 @@ func TestPersistedTokenDurationBoundaries(t *testing.T) {
 
 func TestPersistedWindowAndSignedBoundaries(t *testing.T) {
 	t.Parallel()
+	if !validPersistedMicros(-maxExactMicros) || !validPersistedMicros(maxExactMicros) ||
+		validPersistedMicros(-maxExactMicros-1) || validPersistedMicros(maxExactMicros+1) {
+		t.Fatal("persisted microsecond boundary diverged")
+	}
 
 	request := postgresRequest(t)
 	state := &persistedState{Window: floor(request.Now.UnixMicro(), request.Policy.Period().Microseconds()), Used: 2}
@@ -249,12 +447,42 @@ func TestPersistedWindowAndSignedBoundaries(t *testing.T) {
 	}
 }
 
+func TestValidateServerClockRangeBoundaries(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name     string
+		now      time.Time
+		duration time.Duration
+		want     error
+	}{
+		{name: "exact lower", now: time.UnixMicro(-maxExactMicros), duration: time.Microsecond},
+		{name: "below lower", now: time.UnixMicro(-maxExactMicros - 1), duration: time.Microsecond, want: ratelimit.ErrOverflow},
+		{name: "zero duration", now: time.UnixMicro(0), duration: 0, want: ratelimit.ErrOverflow},
+		{name: "negative duration", now: time.UnixMicro(0), duration: -time.Microsecond, want: ratelimit.ErrOverflow},
+		{name: "exact sum", now: time.UnixMicro(maxExactMicros - 1), duration: time.Microsecond},
+		{name: "sum overflow", now: time.UnixMicro(maxExactMicros), duration: time.Microsecond, want: ratelimit.ErrOverflow},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateServerClockRange(test.now, test.duration)
+			if !errors.Is(err, test.want) || test.want == nil && err != nil {
+				t.Fatalf("validateServerClockRange(%s, %s) = %v, want %v", test.now, test.duration, err, test.want)
+			}
+		})
+	}
+}
+
 func TestPersistedSlidingWindowArithmetic(t *testing.T) {
 	t.Parallel()
 
 	policy := postgresPolicyForMutation(t, ratelimit.SlidingWindow, 3, time.Second)
 	request := postgresTokenRequest(t, time.Unix(20, 0), 1)
 	request.Policy = policy
+	fresh, freshDecision, err := mutateState(nil, request)
+	if err != nil || !freshDecision.Allowed || freshDecision.Remaining != 2 || !freshDecision.Reset.Equal(request.Now.Add(time.Second)) ||
+		fresh.Used != 1 || fresh.Segments[0].Index != 320 || fresh.Segments[0].Used != 1 {
+		t.Fatalf("fresh mutateState(sliding) = %+v, %+v, %v", fresh, freshDecision, err)
+	}
 	state := &persistedState{}
 	state.Segments[0] = persistedSegment{Index: 320, Used: 1}
 	state.Segments[1] = persistedSegment{Index: 305, Used: 1}
@@ -263,7 +491,8 @@ func TestPersistedSlidingWindowArithmetic(t *testing.T) {
 	if err != nil || !decision.Allowed || decision.Remaining != 0 {
 		t.Fatalf("mutateSliding() = %+v, %v", decision, err)
 	}
-	if state.Segments[0] != (persistedSegment{Index: 320, Used: 2}) || state.Used != 3 {
+	if state.Segments[0] != (persistedSegment{Index: 320, Used: 2}) ||
+		state.Segments[2] != (persistedSegment{}) || state.Used != 3 {
 		t.Fatalf("sliding state = %+v", state)
 	}
 	wantReset := time.UnixMicro(306 * 62_500).Add(time.Second)

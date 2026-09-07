@@ -6,12 +6,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	ratelimit "github.com/faustbrian/go-rate-limit"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -34,8 +38,8 @@ func TestStateCorruptionRollbackAndArithmeticEdges(t *testing.T) {
 		Schema: stateSchema, PolicyID: leaseRequest.Request.Policy.ID(),
 		Algorithm: ratelimit.Concurrency,
 		Leases: map[string]persistedLease{
-			"a": {Cost: 2, ExpiresMicros: time.Unix(200, 0).UnixMicro()},
-			"b": {Cost: 1, ExpiresMicros: time.Unix(200, 0).UnixMicro()},
+			strings.Repeat("a", 64): {Cost: 2, ExpiresMicros: time.Unix(200, 0).UnixMicro()},
+			strings.Repeat("b", 64): {Cost: 1, ExpiresMicros: time.Unix(200, 0).UnixMicro()},
 		},
 	}
 	if _, _, decision, err := mutateLease(overused, leaseRequest, "x"); !errors.Is(err, ratelimit.ErrRejected) || decision.Remaining != 0 {
@@ -149,35 +153,83 @@ type rowFunc func(...any) error
 func (row rowFunc) Scan(destinations ...any) error { return row(destinations...) }
 
 type fakeDatabase struct {
-	beginErr error
-	tx       *fakeTransaction
-	row      pgx.Row
+	beginErr     error
+	tx           *fakeTransaction
+	row          pgx.Row
+	beginAt      time.Time
+	beginDelay   time.Duration
+	queryCtx     context.Context
+	queries      int
+	panicOnQuery any
 }
 
 func (database *fakeDatabase) begin(context.Context) (nativeTransaction, error) {
 	if database.beginErr != nil {
 		return nil, database.beginErr
 	}
+	database.beginAt = time.Now()
+	time.Sleep(database.beginDelay)
 	return database.tx, nil
 }
 
-func (database *fakeDatabase) queryRow(context.Context, string, ...any) pgx.Row {
+func (database *fakeDatabase) queryRow(ctx context.Context, _ string, _ ...any) pgx.Row {
+	database.queries++
+	database.queryCtx = ctx
+	if database.panicOnQuery != nil {
+		panic(database.panicOnQuery)
+	}
 	return database.row
 }
 
 type fakeTransaction struct {
-	rows        []pgx.Row
-	execErrs    []error
-	execQueries []string
-	execArgs    [][]any
-	commitErr   error
-	rollbackErr error
+	rows          []pgx.Row
+	queryCalls    int
+	queryArgs     [][]any
+	queryPanicAt  int
+	queryPanic    any
+	queryGoexitAt int
+	execErrs      []error
+	execQueries   []string
+	execArgs      [][]any
+	commitErr     error
+	rollbackErr   error
+	rollbackCtx   context.Context
+	rollbackFunc  func(context.Context) error
 }
 
-func (tx *fakeTransaction) queryRow(context.Context, string, ...any) pgx.Row {
+func (tx *fakeTransaction) queryRow(_ context.Context, query string, arguments ...any) pgx.Row {
+	tx.queryCalls++
+	tx.queryArgs = append(tx.queryArgs, append([]any(nil), arguments...))
+	if tx.queryCalls == tx.queryGoexitAt {
+		runtime.Goexit()
+	}
+	if tx.queryCalls == tx.queryPanicAt {
+		panic(tx.queryPanic)
+	}
 	row := tx.rows[0]
 	tx.rows = tx.rows[1:]
+	if query == selectStateStrictSQL {
+		if _, ok := row.(strictStateRow); !ok {
+			row = strictStateRow{row: row, withinLimit: true}
+		}
+	}
 	return row
+}
+
+type strictStateRow struct {
+	row         pgx.Row
+	withinLimit bool
+}
+
+func (row strictStateRow) Scan(destinations ...any) error {
+	if len(destinations) != 3 {
+		return fmt.Errorf("strict state destinations = %d", len(destinations))
+	}
+	if err := row.row.Scan(destinations[:2]...); err != nil {
+		return err
+	}
+	*(destinations[2].(*bool)) = row.withinLimit
+	return nil
 }
 
 func (tx *fakeTransaction) exec(_ context.Context, query string, arguments ...any) error {
@@ -191,8 +243,91 @@ func (tx *fakeTransaction) exec(_ context.Context, query string, arguments ...an
 	return err
 }
 
-func (tx *fakeTransaction) commit(context.Context) error   { return tx.commitErr }
-func (tx *fakeTransaction) rollback(context.Context) error { return tx.rollbackErr }
+func (tx *fakeTransaction) commit(context.Context) error { return tx.commitErr }
+func (tx *fakeTransaction) rollback(ctx context.Context) error {
+	tx.rollbackCtx = ctx
+	if tx.rollbackFunc != nil {
+		return tx.rollbackFunc(ctx)
+	}
+	return tx.rollbackErr
+}
+
+type fakeTransactionPool struct {
+	tx  pgx.Tx
+	row pgx.Row
+}
+
+func (pool *fakeTransactionPool) Begin(context.Context) (pgx.Tx, error) { return pool.tx, nil }
+func (pool *fakeTransactionPool) QueryRow(context.Context, string, ...any) pgx.Row {
+	return pool.row
+}
+
+type fakePGXTransaction struct {
+	row         pgx.Row
+	execErr     error
+	commitErr   error
+	rollbackErr error
+}
+
+func (tx *fakePGXTransaction) Begin(context.Context) (pgx.Tx, error) { panic("unused") }
+func (tx *fakePGXTransaction) Commit(context.Context) error          { return tx.commitErr }
+func (tx *fakePGXTransaction) Rollback(context.Context) error        { return tx.rollbackErr }
+func (tx *fakePGXTransaction) CopyFrom(context.Context, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error) {
+	panic("unused")
+}
+func (tx *fakePGXTransaction) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
+	panic("unused")
+}
+func (tx *fakePGXTransaction) LargeObjects() pgx.LargeObjects { panic("unused") }
+func (tx *fakePGXTransaction) Prepare(context.Context, string, string) (*pgconn.StatementDescription, error) {
+	panic("unused")
+}
+func (tx *fakePGXTransaction) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return pgconn.NewCommandTag("UPDATE 1"), tx.execErr
+}
+func (tx *fakePGXTransaction) Query(context.Context, string, ...any) (pgx.Rows, error) {
+	panic("unused")
+}
+func (tx *fakePGXTransaction) QueryRow(context.Context, string, ...any) pgx.Row { return tx.row }
+func (tx *fakePGXTransaction) Conn() *pgx.Conn                                  { panic("unused") }
+
+func TestPoolAdaptersAndOpenSuccessPassThrough(t *testing.T) {
+	t.Parallel()
+
+	row := rowFunc(func(...any) error { return nil })
+	commitErr := errors.New("commit")
+	rollbackErr := errors.New("rollback")
+	pgxTx := &fakePGXTransaction{row: row, commitErr: commitErr, rollbackErr: rollbackErr}
+	database := poolDatabase{pool: &fakeTransactionPool{tx: pgxTx, row: row}}
+	transaction, err := database.begin(context.Background())
+	if err != nil || transaction.queryRow(context.Background(), "query") == nil {
+		t.Fatalf("begin/queryRow = %+v, %v", transaction, err)
+	}
+	if database.queryRow(context.Background(), "query") == nil {
+		t.Fatal("pool queryRow did not pass through")
+	}
+	if err := transaction.exec(context.Background(), "exec"); err != nil {
+		t.Fatal(err)
+	}
+	if err := transaction.commit(context.Background()); !errors.Is(err, commitErr) {
+		t.Fatalf("commit error = %v", err)
+	}
+	if err := transaction.rollback(context.Background()); !errors.Is(err, rollbackErr) {
+		t.Fatalf("rollback error = %v", err)
+	}
+
+	table := "rate_limit_states"
+	store := &Store{
+		executor: &nativeExecutor{database: &fakeDatabase{row: rowFunc(func(destinations ...any) error {
+			*(destinations[0].(**string)) = &table
+			return nil
+		})}},
+	}
+	opened, err := openChecked(context.Background(), func() (*Store, error) { return store, nil })
+	if err != nil || opened != store {
+		t.Fatalf("openChecked() = %+v, %v", opened, err)
+	}
+}
 
 func TestPostgresStoreAndNativeControlEdges(t *testing.T) {
 	t.Parallel()
@@ -452,6 +587,20 @@ func TestNativeLeaseAndStoreFailureEdges(t *testing.T) {
 	}}, options: Options{Timeout: time.Second, LockTimeout: time.Second}}
 	if _, _, err := corruptExecutor.acquire(context.Background(), key, request, digest); !errors.Is(err, ratelimit.ErrCorrupt) {
 		t.Fatalf("corrupt acquire() error = %v", err)
+	}
+	mismatchRow := rowFunc(func(destinations ...any) error {
+		*(destinations[0].(*[]byte)) = encodeState(&persistedState{
+			Schema: stateSchema, PolicyID: request.Request.Policy.ID(), Algorithm: ratelimit.Concurrency,
+			Leases: map[string]persistedLease{digest: {Cost: request.Request.Cost + 1, ExpiresMicros: request.Request.Now.Add(time.Second).UnixMicro()}},
+		})
+		*(destinations[1].(*time.Time)) = request.Request.Now.Add(time.Second)
+		return nil
+	})
+	mismatchTx := &fakeTransaction{rows: []pgx.Row{setRow, lockRow, mismatchRow}}
+	mismatchExecutor := &nativeExecutor{database: &fakeDatabase{tx: mismatchTx}, options: Options{Timeout: time.Second, LockTimeout: time.Second}}
+	leaseResult, decision, err := mismatchExecutor.acquire(context.Background(), key, request, digest)
+	if leaseResult != (ratelimit.Lease{}) || decision != (ratelimit.Decision{}) || !errors.Is(err, ratelimit.ErrLeaseNotOwned) || len(mismatchTx.execQueries) != 0 {
+		t.Fatalf("mismatched acquire() = %+v, %+v, %v; writes=%d", leaseResult, decision, err, len(mismatchTx.execQueries))
 	}
 
 	lease := edgeLease(t)

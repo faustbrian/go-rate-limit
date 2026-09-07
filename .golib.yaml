@@ -23,6 +23,11 @@ api:
       path: api/baseline.txt
       packages:
         - .
+        - ./adapters/http
+        - ./adapters/slog
+        - ./adapters/authentication
+        - ./adapters/queue
+        - ./adapters/otel
         - ./memory
         - ./postgres
         - ./ratelimithttp
@@ -31,6 +36,7 @@ api:
         - ./ratelimitqueue
         - ./ratelimitrpc
         - ./ratelimittelemetry
+        - ./ratelimittest
         - ./valkey
 
 operations:
@@ -64,6 +70,11 @@ operations:
       - type: go-test
         packages: [./ratelimithttp]
         fuzz: '^FuzzTrustedProxyChainNeverPanics$'
+        budget: 100x
+        timeout: 2m
+      - type: go-test
+        packages: [./adapters/http]
+        fuzz: '^FuzzClientIPNeverPanics$'
         budget: 100x
         timeout: 2m
       - type: go-test
