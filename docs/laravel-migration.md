@@ -11,11 +11,12 @@ become Period; Laravel attempts become weighted Cost.
 
 Replace RateLimiter::attempt and tooManyAttempts with Service.Admit. Handle
 ErrRejected separately from backend failures and emit Decision headers through
-ratelimithttp. Do not sleep inside admission.
+`adapters/http`. Do not sleep inside admission.
 
-Replace job throttling middleware with ratelimitqueue. On Deferred, return the
-queue's native release/nack instruction without acknowledging the job. Durable
-attempt counts, retry policy, and dead-letter behavior remain with queue.
+Replace job throttling middleware with `adapters/queue`. On `Deferred`, return
+the queue's native release/nack instruction without acknowledging the job.
+Durable attempt counts, retry policy, and dead-letter behavior remain with
+queue.
 
 Laravel cache-wide behavior usually requires Valkey. Memory is process-local
 and changes semantics under multiple Go replicas. PostgreSQL is appropriate

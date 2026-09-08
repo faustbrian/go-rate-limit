@@ -11,16 +11,18 @@ import (
 
 // Reference is a mutex-protected rational-arithmetic algorithm model.
 type Reference struct {
-	mu     sync.Mutex
+	mu     contextMutex
 	states map[string]*referenceState
 }
 
 type referenceState struct {
 	algorithm ratelimit.Algorithm
+	revision  string
 	observed  time.Time
 	tokens    *big.Rat
 	last      time.Time
 	window    int64
+	period    time.Duration
 	used      uint64
 	segments  [16]referenceSegment
 	leases    map[string]referenceLease
@@ -38,7 +40,39 @@ type referenceLease struct {
 
 // NewReference constructs an empty reference model.
 func NewReference() *Reference {
-	return &Reference{states: make(map[string]*referenceState)}
+	return &Reference{mu: newContextMutex(), states: make(map[string]*referenceState)}
+}
+
+type contextMutex struct {
+	once sync.Once
+	lock chan struct{}
+}
+
+func newContextMutex() contextMutex {
+	lock := make(chan struct{}, 1)
+	lock <- struct{}{}
+	return contextMutex{lock: lock}
+}
+
+func (mutex *contextMutex) channel() chan struct{} {
+	mutex.once.Do(func() {
+		if mutex.lock == nil {
+			mutex.lock = make(chan struct{}, 1)
+			mutex.lock <- struct{}{}
+		}
+	})
+	return mutex.lock
+}
+
+func (mutex *contextMutex) Lock()   { <-mutex.channel() }
+func (mutex *contextMutex) Unlock() { mutex.channel() <- struct{}{} }
+func (mutex *contextMutex) LockContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-mutex.channel():
+		return nil
+	}
 }
 
 // Name returns the stable reference backend identifier.
@@ -55,7 +89,30 @@ func (reference *Reference) Admit(ctx context.Context, request ratelimit.Request
 	request.Now = time.UnixMicro(request.Now.UnixMicro()).UTC()
 	reference.mu.Lock()
 	defer reference.mu.Unlock()
+	return reference.admitLocked(request, false)
+}
+
+func (reference *Reference) admitLocked(request ratelimit.Request, strict bool) (ratelimit.Decision, error) {
 	current := reference.state(request)
+	if strict && current.algorithm != request.Policy.Algorithm() {
+		return ratelimit.Decision{}, ratelimit.ErrCorrupt
+	}
+	if strict && current.algorithm == ratelimit.TokenBucket {
+		limit := new(big.Rat).SetInt(new(big.Int).SetUint64(request.Policy.Limit()))
+		if current.tokens.Sign() < 0 || current.revision == request.Policy.Revision() && current.tokens.Cmp(limit) > 0 {
+			return ratelimit.Decision{}, ratelimit.ErrCorrupt
+		}
+		if current.revision != request.Policy.Revision() {
+			if current.tokens.Cmp(limit) > 0 {
+				current.tokens.Set(limit)
+			}
+			current.tokens.SetInt(new(big.Int).SetUint64(floorRat(current.tokens)))
+			current.last = clampTime(request.Now, current.last)
+		}
+	}
+	if strict {
+		current.revision = request.Policy.Revision()
+	}
 	request.Now = clampTime(request.Now, current.observed)
 	current.observed = request.Now
 	switch request.Policy.Algorithm() {
@@ -81,7 +138,17 @@ func (reference *Reference) Acquire(ctx context.Context, request ratelimit.Lease
 	request.Request.Now = time.UnixMicro(request.Request.Now.UnixMicro()).UTC()
 	reference.mu.Lock()
 	defer reference.mu.Unlock()
+	return reference.acquireLocked(request, false)
+}
+
+func (reference *Reference) acquireLocked(request ratelimit.LeaseRequest, strict bool) (ratelimit.Lease, ratelimit.Decision, error) {
 	current := reference.state(request.Request)
+	if strict && current.algorithm != ratelimit.Concurrency {
+		return ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
+	}
+	if strict {
+		current.revision = request.Request.Policy.Revision()
+	}
 	request.Request.Now = clampTime(request.Request.Now, current.observed)
 	current.observed = request.Request.Now
 	var used uint64
@@ -131,6 +198,10 @@ func (reference *Reference) Release(ctx context.Context, lease ratelimit.Lease) 
 	}
 	reference.mu.Lock()
 	defer reference.mu.Unlock()
+	return reference.releaseLocked(lease)
+}
+
+func (reference *Reference) releaseLocked(lease ratelimit.Lease) error {
 	current, ok := reference.states[lease.PolicyID+"\x00"+lease.Key.String()]
 	if !ok {
 		return ratelimit.ErrLeaseNotFound
@@ -151,9 +222,9 @@ func (reference *Reference) state(request ratelimit.Request) *referenceState {
 	current, ok := reference.states[key]
 	if !ok {
 		current = &referenceState{
-			algorithm: request.Policy.Algorithm(), observed: request.Now,
+			algorithm: request.Policy.Algorithm(), revision: request.Policy.Revision(), observed: request.Now,
 			tokens: new(big.Rat).SetInt(new(big.Int).SetUint64(request.Policy.Limit())),
-			last:   request.Now, leases: make(map[string]referenceLease),
+			last:   request.Now, period: request.Policy.Period(), leases: make(map[string]referenceLease),
 		}
 		reference.states[key] = current
 	}

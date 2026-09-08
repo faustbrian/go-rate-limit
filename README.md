@@ -15,6 +15,9 @@ provides deterministic token-bucket, fixed-window, bounded sliding-counter,
 and concurrency-lease policies with memory, native Valkey, and native
 PostgreSQL backends.
 
+The module lifecycle is **active** and its API maturity is **stable**. Go
+1.26.6 is both the minimum supported and continuously tested Go version.
+
 This library owns inbound request, RPC, queue-admission, and application
 operation limits. It does not own authorization, billing quotas, WAF rules,
 queue acknowledgement, outbound retries, or HTTP transport pacing. Outbound
@@ -41,7 +44,7 @@ all replicas; that lease is application admission, not HTTP retry or pacing.
         Hash: true,
     })
     backend, _ := memory.New(memory.Options{MaxKeys: 100_000, Shards: 64})
-    service, _ := ratelimit.NewService(backend)
+    service, _ := ratelimit.NewStrictService(backend)
     decision, err := service.Admit(ctx, ratelimit.Request{
         Policy: policy,
         Key: key,
@@ -58,12 +61,12 @@ cluster-wide limit.
         InitAddress: []string{"127.0.0.1:6379"},
     })
     defer client.Close()
-    backend, _ := valkey.Open(ctx, client, valkey.Options{
+    backend, _ := valkey.OpenStrict(ctx, client, valkey.Options{
         Prefix: "my-service-rate-limit",
         Timeout: 100 * time.Millisecond,
         Clock: valkey.ServerClock,
     })
-    service, _ := ratelimit.NewService(backend)
+    service, _ := ratelimit.NewStrictService(backend)
 
 Valkey 9 or newer with maxmemory-policy=noeviction is required. Each state key
 uses an opaque SHA-256 hash tag, all mutation is atomic Lua, scripts recover
@@ -75,9 +78,12 @@ from NOSCRIPT through valkey-go, and state has a bounded TTL.
 - memory: bounded sharded process-local backend.
 - valkey: native valkey-go scripts and cluster-safe keys.
 - postgres: native pgx transactions, cleanup, and migrations ownership.
-- ratelimithttp, ratelimitrpc, ratelimitqueue: inbound adapters.
-- ratelimitprincipal: narrow authentication-compatible principal adapter.
-- ratelimitlog and ratelimittelemetry: slog and OpenTelemetry observations.
+- adapters/http and adapters/queue: strict inbound adapters; ratelimitrpc
+  remains the supported JSON-RPC integration.
+- adapters/authentication: strict authentication-compatible principal adapter.
+- adapters/slog and adapters/otel: bounded slog and OpenTelemetry observations.
+- The ratelimithttp, ratelimitlog, ratelimitprincipal, ratelimitqueue, and
+  ratelimittelemetry paths remain available during the compatibility interval.
 - ratelimittest: deterministic clocks, reference models, and conformance.
 
 ## Documentation

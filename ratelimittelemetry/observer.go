@@ -3,6 +3,7 @@ package ratelimittelemetry
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	ratelimit "github.com/faustbrian/go-rate-limit"
 	"go.opentelemetry.io/otel/attribute"
@@ -46,6 +47,27 @@ func New(options Options) (*Observer, error) {
 		return nil, err
 	}
 	return &Observer{decisions: decisions, duration: duration}, nil
+}
+
+// NewStrict constructs metric instruments after panic-safe provider validation.
+func NewStrict(options Options) (*Observer, error) {
+	if nilInterface(options.MeterProvider) {
+		return nil, fmt.Errorf("%w: meter provider is required", ratelimit.ErrInvalidPolicy)
+	}
+	return New(options)
+}
+
+func nilInterface(value any) bool {
+	if value == nil {
+		return true
+	}
+	current := reflect.ValueOf(value)
+	switch current.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return current.IsNil()
+	default:
+		return false
+	}
 }
 
 // Observe records one bounded decision and its duration.

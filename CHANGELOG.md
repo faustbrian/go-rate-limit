@@ -5,7 +5,47 @@ versioning after v1.0.0.
 
 ## Unreleased
 
+## 1.1.0 - 2026-09-07
+
+### Added
+
+- Add strict admission, batch, lease, cancellation, deadline, and
+  outcome-unknown contracts with strict memory, PostgreSQL, Valkey, and
+  reference backends.
+- Add checked HTTP and queue middleware plus successor authentication, slog,
+  and OpenTelemetry adapters under `adapters/`.
+
+### Deprecated
+
+- Prefer `adapters/http`, `adapters/queue`, `adapters/slog`,
+  `adapters/otel`, and `adapters/authentication` over `ratelimithttp`,
+  `ratelimitqueue`, `ratelimitlog`, `ratelimittelemetry`, and
+  `ratelimitprincipal`. The legacy package paths remain supported through the
+  documented compatibility interval.
+
 ### Changed
+
+- Direct new callers to strict constructors and successor adapter paths while
+  preserving released v1 APIs and compatibility behavior.
+- Saturate strict Valkey state TTLs for valid very-long policy
+  periods instead of allowing duration overflow to collapse retention to one
+  second.
+- Make strict PostgreSQL state handling fail closed with `ErrCorrupt` for malformed
+  sliding-window shape, out-of-range timestamps, remainders, token or lease
+  costs, overflowing sliding usage, and state documents exceeding 128 KiB;
+  oversized documents are rejected in SQL before their bytes cross the driver
+  boundary.
+- Reject strict transitions whose rollback-clamped effective time exceeds the
+  exact backend range, and reject impossible same-revision fixed- or
+  sliding-window usage or active sliding segment positions as corrupt state in
+  PostgreSQL and Valkey. Same-period revisions retain full carried window
+  consumption across capacity decreases and later increases; strict backends
+  reject same-ID window-period changes instead of reinterpreting stored
+  indexes. Valkey fixed windows derive their boundary from the clamped time.
+- Preserve released reference and Valkey revision transitions by isolating
+  strict revision and corruption validation from legacy mutation paths.
+- Bound forwarded header bytes and hops while preserving the released
+  `http.Header.Get` first-value behavior for repeated `X-Forwarded-For` lines.
 
 - Replace copied repository tooling with the pinned `go-library-tools` v1.0.5
   contract while retaining package-owned policy and verification evidence.

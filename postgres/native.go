@@ -14,11 +14,14 @@ import (
 
 const (
 	// MaxCleanupBatch bounds rows locked and returned by one cleanup statement.
-	MaxCleanupBatch   = 10_000
-	setLockTimeoutSQL = "SELECT set_config('lock_timeout', $1, true)"
-	lockAndTimeSQL    = "SELECT pg_advisory_xact_lock($1), clock_timestamp()"
-	selectStateSQL    = "SELECT state, expires_at FROM rate_limit_states " +
+	MaxCleanupBatch      = 10_000
+	maxEncodedStateBytes = 128 * 1024
+	setLockTimeoutSQL    = "SELECT set_config('lock_timeout', $1, true)"
+	lockAndTimeSQL       = "SELECT pg_advisory_xact_lock($1), clock_timestamp()"
+	selectStateSQL       = "SELECT state, expires_at FROM rate_limit_states " +
 		"WHERE state_key = $1 FOR UPDATE"
+	selectStateStrictSQL = "SELECT CASE WHEN octet_length(state::text) <= $2 THEN state END, expires_at, " +
+		"octet_length(state::text) <= $2 FROM rate_limit_states WHERE state_key = $1 FOR UPDATE"
 	deleteStateSQL = "DELETE FROM rate_limit_states WHERE state_key = $1"
 	upsertStateSQL = "INSERT INTO rate_limit_states " +
 		"(state_key, state, expires_at, updated_at) VALUES ($1, $2, $3, $4) " +
@@ -49,7 +52,12 @@ type nativeTransaction interface {
 	rollback(context.Context) error
 }
 
-type poolDatabase struct{ pool *pgxpool.Pool }
+type transactionPool interface {
+	Begin(context.Context) (pgx.Tx, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+type poolDatabase struct{ pool transactionPool }
 
 func (database poolDatabase) begin(ctx context.Context) (nativeTransaction, error) {
 	tx, err := database.pool.Begin(ctx)
@@ -90,7 +98,11 @@ func New(pool *pgxpool.Pool, options Options) (*Store, error) {
 
 // Open constructs a Store and verifies the package-owned table exists.
 func Open(ctx context.Context, pool *pgxpool.Pool, options Options) (*Store, error) {
-	store, err := New(pool, options)
+	return openChecked(ctx, func() (*Store, error) { return New(pool, options) })
+}
+
+func openChecked(ctx context.Context, construct func() (*Store, error)) (*Store, error) {
+	store, err := construct()
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +160,7 @@ func (executor *nativeExecutor) admit(ctx context.Context, key []byte, request r
 	if err != nil {
 		return ratelimit.Decision{}, err
 	}
-	next, decision, resultErr := mutateState(current, request)
+	next, decision, resultErr := mutateStateLegacy(current, request)
 	if resultErr != nil {
 		if !errors.Is(resultErr, ratelimit.ErrRejected) {
 			return ratelimit.Decision{}, resultErr
@@ -176,12 +188,29 @@ func loadState(ctx context.Context, tx nativeTransaction, key []byte, now time.T
 		return nil, err
 	}
 	if expiresAt.After(now) {
-		return decodeState(encoded)
+		return decodeStateLegacy(encoded)
 	}
-	if err := tx.exec(ctx, deleteStateSQL, key); err != nil {
+	return nil, tx.exec(ctx, deleteStateSQL, key)
+}
+
+func loadStateStrict(ctx context.Context, tx nativeTransaction, key []byte, now time.Time) (*persistedState, error) {
+	var encoded []byte
+	var expiresAt time.Time
+	var withinLimit bool
+	err := tx.queryRow(ctx, selectStateStrictSQL, key, maxEncodedStateBytes).Scan(&encoded, &expiresAt, &withinLimit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	if !withinLimit {
+		return nil, ratelimit.ErrCorrupt
+	}
+	if expiresAt.After(now) {
+		return decodeState(encoded)
+	}
+	return nil, tx.exec(ctx, deleteStateSQL, key)
 }
 
 func advisoryKey(key []byte) int64 {

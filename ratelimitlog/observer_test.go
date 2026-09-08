@@ -45,3 +45,16 @@ func TestObserverLogsOnlyBoundedDecisionMetadata(t *testing.T) {
 		t.Fatalf("log leaked sensitive data: %q", logged)
 	}
 }
+
+func TestObserverNilAndZeroReceiversRetainLegacyPanic(t *testing.T) {
+	for _, observer := range []*ratelimitlog.Observer{nil, new(ratelimitlog.Observer)} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("legacy Observe() did not panic")
+				}
+			}()
+			observer.Observe(ratelimit.Observation{})
+		}()
+	}
+}

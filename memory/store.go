@@ -8,7 +8,6 @@ import (
 	"math/bits"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,22 +37,23 @@ type Store struct {
 }
 
 type shard struct {
-	mu      sync.Mutex
+	mu      contextMutex
 	maxKeys int
 	states  map[string]*state
 }
 
 type state struct {
-	revision    string
-	algorithm   ratelimit.Algorithm
-	lastSeen    time.Time
-	tokens      uint64
-	remainder   uint64
-	lastRefill  time.Time
-	windowStart int64
-	used        uint64
-	segments    [slidingSegments]segment
-	leases      map[string]leaseState
+	revision     string
+	algorithm    ratelimit.Algorithm
+	lastSeen     time.Time
+	tokens       uint64
+	remainder    uint64
+	lastRefill   time.Time
+	windowStart  int64
+	windowPeriod time.Duration
+	used         uint64
+	segments     [slidingSegments]segment
+	leases       map[string]leaseState
 }
 
 type segment struct {
@@ -87,6 +87,7 @@ func New(options Options) (*Store, error) {
 	base := options.MaxKeys / options.Shards
 	extra := options.MaxKeys % options.Shards
 	for index := range store.shards {
+		store.shards[index].mu = newContextMutex()
 		store.shards[index].maxKeys = base
 		if index < extra {
 			store.shards[index].maxKeys++
@@ -94,6 +95,31 @@ func New(options Options) (*Store, error) {
 		store.shards[index].states = make(map[string]*state)
 	}
 	return store, nil
+}
+
+type contextMutex struct {
+	lock chan struct{}
+}
+
+func newContextMutex() contextMutex {
+	lock := make(chan struct{}, 1)
+	lock <- struct{}{}
+	return contextMutex{lock: lock}
+}
+
+func (mutex *contextMutex) channel() chan struct{} {
+	return mutex.lock
+}
+
+func (mutex *contextMutex) Lock()   { <-mutex.channel() }
+func (mutex *contextMutex) Unlock() { mutex.channel() <- struct{}{} }
+func (mutex *contextMutex) LockContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-mutex.channel():
+		return nil
+	}
 }
 
 // Name returns the stable backend identifier.
@@ -118,7 +144,10 @@ func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratel
 	target := store.shardFor(key)
 	target.mu.Lock()
 	defer target.mu.Unlock()
+	return target.admitLocked(key, request)
+}
 
+func (target *shard) admitLocked(key string, request ratelimit.Request) (ratelimit.Decision, error) {
 	if existing, ok := target.states[key]; ok && existing.algorithm != request.Policy.Algorithm() {
 		return ratelimit.Decision{}, ratelimit.ErrCorrupt
 	}
@@ -155,6 +184,10 @@ func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest)
 	target := store.shardFor(key)
 	target.mu.Lock()
 	defer target.mu.Unlock()
+	return target.acquireLocked(key, request)
+}
+
+func (target *shard) acquireLocked(key string, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error) {
 	if existing, ok := target.states[key]; ok && existing.algorithm != request.Request.Policy.Algorithm() {
 		return ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrCorrupt
 	}
@@ -219,6 +252,11 @@ func (store *Store) Release(ctx context.Context, lease ratelimit.Lease) error {
 	target := store.shardFor(key)
 	target.mu.Lock()
 	defer target.mu.Unlock()
+	return target.releaseLocked(lease)
+}
+
+func (target *shard) releaseLocked(lease ratelimit.Lease) error {
+	key := lease.PolicyID + "\x00" + lease.Key.String()
 	current, ok := target.states[key]
 	if !ok || current.leases == nil {
 		return ratelimit.ErrLeaseNotFound
@@ -305,7 +343,7 @@ func (target *shard) getOrCreate(key string, request ratelimit.Request) (*state,
 	}
 	current := &state{
 		revision: request.Policy.Revision(), algorithm: request.Policy.Algorithm(),
-		lastSeen: request.Now, lastRefill: request.Now,
+		lastSeen: request.Now, lastRefill: request.Now, windowPeriod: request.Policy.Period(),
 		tokens: request.Policy.Limit(),
 	}
 	target.states[key] = current

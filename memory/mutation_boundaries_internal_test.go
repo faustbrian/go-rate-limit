@@ -84,8 +84,8 @@ func TestLenTotalsEveryShard(t *testing.T) {
 	t.Parallel()
 
 	store := &Store{shards: []shard{
-		{states: map[string]*state{"one": {}}},
-		{states: map[string]*state{"two": {}, "three": {}}},
+		{mu: newContextMutex(), states: map[string]*state{"one": {}}},
+		{mu: newContextMutex(), states: map[string]*state{"two": {}, "three": {}}},
 	}}
 	if got := store.Len(); got != 3 {
 		t.Fatalf("Len() = %d", got)

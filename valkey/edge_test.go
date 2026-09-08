@@ -16,6 +16,7 @@ type fullExecutor struct {
 	acquireReply []string
 	acquireArgs  []string
 	releaseReply []string
+	releaseArgs  []string
 	leaseErr     error
 }
 
@@ -24,7 +25,8 @@ func (executor *fullExecutor) acquire(_ context.Context, _ []string, args []stri
 	return executor.acquireReply, executor.leaseErr
 }
 
-func (executor *fullExecutor) release(context.Context, []string, []string) ([]string, error) {
+func (executor *fullExecutor) release(_ context.Context, _ []string, args []string) ([]string, error) {
+	executor.releaseArgs = append([]string(nil), args...)
 	return executor.releaseReply, executor.leaseErr
 }
 

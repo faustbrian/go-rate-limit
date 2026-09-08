@@ -22,7 +22,7 @@ const (
 
 // Options configures transaction deadlines, lock waits, and clock authority.
 type Options struct {
-	// Timeout bounds each backend operation.
+	// Timeout bounds each admission and lease operation; checks and cleanup use the caller context.
 	Timeout time.Duration
 	// LockTimeout bounds PostgreSQL lock acquisition; zero uses Timeout.
 	LockTimeout time.Duration
@@ -36,8 +36,9 @@ type executor interface {
 
 // Store is an atomic pgx-backed admission backend.
 type Store struct {
-	executor executor
-	options  Options
+	executor        executor
+	options         Options
+	rollbackTimeout time.Duration
 }
 
 func newStore(executor executor, options Options) (*Store, error) {
