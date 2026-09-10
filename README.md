@@ -7,7 +7,7 @@
 [![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-rate-limit?sort=semver)](https://github.com/faustbrian/go-rate-limit/releases)
-[![Go](https://img.shields.io/badge/go-1.26.6-00ADD8?logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/go-1.27.0-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Transport-neutral inbound rate limiting for Go applications. The package
@@ -16,7 +16,7 @@ and concurrency-lease policies with memory, native Valkey, and native
 PostgreSQL backends.
 
 The module lifecycle is **active** and its API maturity is **stable**. Go
-1.26.6 is both the minimum supported and continuously tested Go version.
+1.27.0 is both the minimum supported and continuously tested Go version.
 
 This library owns inbound request, RPC, queue-admission, and application
 operation limits. It does not own authorization, billing quotas, WAF rules,
