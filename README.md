@@ -17,9 +17,9 @@ PostgreSQL backends.
 
 The module lifecycle is **active** and its API maturity is **stable**. Go
 1.27.0 is both the minimum supported and continuously tested Go version.
-Install the v2 module at `github.com/faustbrian/go-rate-limit/v2`. The
-PostgreSQL `GoMigration` adapter returns a `go-migrations/v2` migration;
-callers of that adapter must use the matching migrations major version.
+The v2 module path is `github.com/faustbrian/go-rate-limit/v2`. Once
+v2.0.0 is published, callers of the PostgreSQL `GoMigration` adapter
+must use it with the matching `go-migrations/v2` major version.
 
 This library owns inbound request, RPC, queue-admission, and application
 operation limits. It does not own authorization, billing quotas, WAF rules,

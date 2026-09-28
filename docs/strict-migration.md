@@ -1,6 +1,7 @@
 # Strict API and adapter migration
 
-Install and version the root module. The successor adapters are packages in
+Once v2.0.0 is published, install and version the root module. The
+successor adapters are packages in
 `github.com/faustbrian/go-rate-limit/v2`; they have no independent module, tag,
 or release version.
 
