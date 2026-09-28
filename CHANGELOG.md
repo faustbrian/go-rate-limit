@@ -14,6 +14,12 @@ versioning after v1.0.0.
   Callers must update both module imports together; the package-owned SQL
   migration remains version 1 with the same name and statements.
   ([65f7b871f1](https://github.com/faustbrian/go-rate-limit/commit/65f7b871f166e4216b9a5ddd25b3028dced311d1))
+- Change the OpenTelemetry instrumentation scopes from
+  `github.com/faustbrian/go-rate-limit/adapters/otel` to
+  `github.com/faustbrian/go-rate-limit/v2/adapters/otel` and from
+  `github.com/faustbrian/go-rate-limit/ratelimittelemetry` to
+  `github.com/faustbrian/go-rate-limit/v2/ratelimittelemetry`. Update dashboard
+  and view selectors that match either former scope.
 - Require Go 1.27.0 as the minimum supported and tested toolchain, replacing
   Go 1.26.6 in module and compatibility metadata.
   ([d38ad010ef](https://github.com/faustbrian/go-rate-limit/commit/d38ad010efaa125d2e2c965f48016cc27d691115))
