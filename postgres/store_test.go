@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	migrations "github.com/faustbrian/go-migrations/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -139,8 +140,15 @@ func TestSchemaMigrationOwnsIndexedCleanupTable(t *testing.T) {
 		) || migration.Down != "DROP TABLE rate_limit_states;" {
 		t.Fatalf("migration = %+v", migration)
 	}
-	if _, err := GoMigration(); err != nil {
+	adapted, err := GoMigration()
+	if err != nil {
 		t.Fatalf("GoMigration() error = %v", err)
+	}
+	if adapted.Version() != 1 || adapted.Name() != migration.Name ||
+		adapted.TransactionMode() != migrations.TransactionModeDefault ||
+		adapted.UpSQL() != migration.Up ||
+		adapted.DownSQL() != migration.Down {
+		t.Fatalf("GoMigration() does not preserve the package-owned schema migration")
 	}
 }
 

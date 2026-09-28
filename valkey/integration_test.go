@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/ratelimittest"
-	"github.com/faustbrian/go-rate-limit/valkey"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/ratelimittest"
+	"github.com/faustbrian/go-rate-limit/v2/valkey"
 	valkeygo "github.com/valkey-io/valkey-go"
 )
 

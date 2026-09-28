@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/memory"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/memory"
 )
 
 func TestStrictPublicAPIExists(t *testing.T) {

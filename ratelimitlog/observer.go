@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 // Options configures structured observation logging.

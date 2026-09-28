@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 // ClockPolicy selects the authoritative time source for transactions.

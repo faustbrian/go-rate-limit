@@ -5,7 +5,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-100%25_required-blue)](CONTRIBUTING.md#verification)
 [![Mutation](https://img.shields.io/badge/mutation-100%25_required-blue)](CONTRIBUTING.md#verification)
 [![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
-[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit)
+[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit/v2.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit/v2)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-rate-limit?sort=semver)](https://github.com/faustbrian/go-rate-limit/releases)
 [![Go](https://img.shields.io/badge/go-1.27.0-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -17,6 +17,9 @@ PostgreSQL backends.
 
 The module lifecycle is **active** and its API maturity is **stable**. Go
 1.27.0 is both the minimum supported and continuously tested Go version.
+Install the v2 module at `github.com/faustbrian/go-rate-limit/v2`. The
+PostgreSQL `GoMigration` adapter returns a `go-migrations/v2` migration;
+callers of that adapter must use the matching migrations major version.
 
 This library owns inbound request, RPC, queue-admission, and application
 operation limits. It does not own authorization, billing quotas, WAF rules,

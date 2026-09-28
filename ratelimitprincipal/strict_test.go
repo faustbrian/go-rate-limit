@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/ratelimitprincipal"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/ratelimitprincipal"
 )
 
 type nilPrincipal struct{}

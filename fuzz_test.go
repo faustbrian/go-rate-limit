@@ -3,7 +3,7 @@ package ratelimit_test
 import (
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 func FuzzNewKeyNeverLeaksHashedSubject(f *testing.F) {

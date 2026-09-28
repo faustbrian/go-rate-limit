@@ -4,8 +4,8 @@ package ratelimitotel_test
 import (
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	ratelimitotel "github.com/faustbrian/go-rate-limit/adapters/otel"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimitotel "github.com/faustbrian/go-rate-limit/v2/adapters/otel"
 	"go.opentelemetry.io/otel/metric"
 )
 

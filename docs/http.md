@@ -1,6 +1,6 @@
 # HTTP middleware
 
-New callers use `github.com/faustbrian/go-rate-limit/adapters/http`. Construct
+New callers use `github.com/faustbrian/go-rate-limit/v2/adapters/http`. Construct
 the middleware with a `*ratelimit.StrictService`, then use its checked `Wrap`
 method:
 
@@ -44,7 +44,7 @@ Configuration accepts at most 64 trusted prefixes. The forwarded chain selected
 by `http.Header.Get` is limited to 4,096 bytes and 32 hops; repeated field lines
 retain the released first-value behavior.
 
-The legacy `github.com/faustbrian/go-rate-limit/ratelimithttp` package remains
+The legacy `github.com/faustbrian/go-rate-limit/v2/ratelimithttp` package remains
 supported through the compatibility interval. Its constructor directly returns
 an `http.Handler` wrapper and cannot report a nil or typed-nil handler during
 wrapping; do not use that shape for new integrations.

@@ -3,8 +3,8 @@ package valkey_test
 import (
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/valkey"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/valkey"
 )
 
 func TestStrictPublicAPIExists(t *testing.T) {

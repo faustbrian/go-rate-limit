@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 // MaxPrefixBytes bounds the operator-controlled portion of persisted keys.

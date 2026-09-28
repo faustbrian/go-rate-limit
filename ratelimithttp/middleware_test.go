@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/ratelimithttp"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/ratelimithttp"
 )
 
 type backend struct {

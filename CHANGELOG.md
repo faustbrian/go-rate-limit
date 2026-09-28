@@ -5,6 +5,13 @@ versioning after v1.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Publish the next major module at `github.com/faustbrian/go-rate-limit/v2`
+  so PostgreSQL `GoMigration` can return the `go-migrations/v2` public type.
+  Callers must update both module imports together; the package-owned SQL
+  migration remains version 1 with the same name and statements.
+
 ## 1.1.0 - 2026-09-07
 
 ### Added

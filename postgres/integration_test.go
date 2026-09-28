@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/postgres"
-	"github.com/faustbrian/go-rate-limit/ratelimittest"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/postgres"
+	"github.com/faustbrian/go-rate-limit/v2/ratelimittest"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

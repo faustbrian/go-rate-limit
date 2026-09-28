@@ -1,5 +1,5 @@
 // Package ratelimithttp provides net/http inbound admission middleware and
 // strict trusted-proxy client IP extraction.
 //
-// Deprecated: use github.com/faustbrian/go-rate-limit/adapters/http. This package remains supported through the documented compatibility interval.
+// Deprecated: use github.com/faustbrian/go-rate-limit/v2/adapters/http. This package remains supported through the documented compatibility interval.
 package ratelimithttp

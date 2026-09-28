@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 // AdmitStrict evaluates one request with context-aware lock acquisition.
