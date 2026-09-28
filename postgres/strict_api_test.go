@@ -3,8 +3,8 @@ package postgres_test
 import (
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/postgres"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/postgres"
 )
 
 func TestStrictPublicAPIExists(t *testing.T) {

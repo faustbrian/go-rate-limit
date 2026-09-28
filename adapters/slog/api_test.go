@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	ratelimitslog "github.com/faustbrian/go-rate-limit/adapters/slog"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimitslog "github.com/faustbrian/go-rate-limit/v2/adapters/slog"
 )
 
 func TestPublicAPIExists(t *testing.T) {

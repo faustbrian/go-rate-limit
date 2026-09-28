@@ -25,5 +25,8 @@ The remaining known residuals are:
     potentially unbounded disclosure, and direct/joined traversal remain
     beside the bounded `DoStrict` behavior and are not changed here.
 
-No `adapters/jsonrpc` package, nested module, independent successor tag, or
-immediate `/v2` module is part of this release.
+The v2 module retains the legacy adapter packages while changing the public
+`postgres.GoMigration` return type to `go-migrations/v2.Migration`. Callers
+must update rate-limit and migrations import paths together. No
+`adapters/jsonrpc` package, nested module, or independent successor tag is
+part of this release.

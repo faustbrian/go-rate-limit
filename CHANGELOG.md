@@ -5,6 +5,19 @@ versioning after v1.0.0.
 
 ## Unreleased
 
+## 2.0.0 - 2026-09-28
+
+### Changed
+
+- Publish the next major module at `github.com/faustbrian/go-rate-limit/v2`
+  so PostgreSQL `GoMigration` can return the `go-migrations/v2` public type.
+  Callers must update both module imports together; the package-owned SQL
+  migration remains version 1 with the same name and statements.
+  ([65f7b871f1](https://github.com/faustbrian/go-rate-limit/commit/65f7b871f166e4216b9a5ddd25b3028dced311d1))
+- Require Go 1.27.0 as the minimum supported and tested toolchain, replacing
+  Go 1.26.6 in module and compatibility metadata.
+  ([d38ad010ef](https://github.com/faustbrian/go-rate-limit/commit/d38ad010efaa125d2e2c965f48016cc27d691115))
+
 ## 1.1.0 - 2026-09-07
 
 ### Added

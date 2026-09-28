@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 // Principal is the narrow identity contract required for key derivation.

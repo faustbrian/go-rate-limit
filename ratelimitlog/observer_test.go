@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	"github.com/faustbrian/go-rate-limit/ratelimitlog"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	"github.com/faustbrian/go-rate-limit/v2/ratelimitlog"
 )
 
 func TestObserverLogsOnlyBoundedDecisionMetadata(t *testing.T) {

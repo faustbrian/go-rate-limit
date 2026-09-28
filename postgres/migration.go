@@ -1,6 +1,6 @@
 package postgres
 
-import migrations "github.com/faustbrian/go-migrations"
+import migrations "github.com/faustbrian/go-migrations/v2"
 
 // Migration is the portable SQL definition owned by this package.
 type Migration struct {

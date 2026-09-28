@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	ratelimitqueue "github.com/faustbrian/go-rate-limit/adapters/queue"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimitqueue "github.com/faustbrian/go-rate-limit/v2/adapters/queue"
 )
 
 type nilQueueHandler struct{}

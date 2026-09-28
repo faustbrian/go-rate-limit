@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
 func TestStrictPublicAPIExists(t *testing.T) {

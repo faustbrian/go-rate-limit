@@ -1,23 +1,24 @@
 # Strict API and adapter migration
 
-Install and version the root module. The successor adapters are packages in
-`github.com/faustbrian/go-rate-limit`; they have no independent module, tag,
+Once v2.0.0 is published, install and version the root module. The
+successor adapters are packages in
+`github.com/faustbrian/go-rate-limit/v2`; they have no independent module, tag,
 or release version.
 
 ```sh
-go get github.com/faustbrian/go-rate-limit@latest
+go get github.com/faustbrian/go-rate-limit/v2@latest
 ```
 
 Import the root API and selected successor packages from that same module:
 
 ```go
 import (
-	ratelimit "github.com/faustbrian/go-rate-limit"
-	ratelimitauthentication "github.com/faustbrian/go-rate-limit/adapters/authentication"
-	ratelimithttp "github.com/faustbrian/go-rate-limit/adapters/http"
-	ratelimitotel "github.com/faustbrian/go-rate-limit/adapters/otel"
-	ratelimitqueue "github.com/faustbrian/go-rate-limit/adapters/queue"
-	ratelimitslog "github.com/faustbrian/go-rate-limit/adapters/slog"
+	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimitauthentication "github.com/faustbrian/go-rate-limit/v2/adapters/authentication"
+	ratelimithttp "github.com/faustbrian/go-rate-limit/v2/adapters/http"
+	ratelimitotel "github.com/faustbrian/go-rate-limit/v2/adapters/otel"
+	ratelimitqueue "github.com/faustbrian/go-rate-limit/v2/adapters/queue"
+	ratelimitslog "github.com/faustbrian/go-rate-limit/v2/adapters/slog"
 )
 ```
 
@@ -35,7 +36,7 @@ The legacy paths remain supported through the documented compatibility
 interval. Successors own their named Go types rather than aliasing legacy
 types, so reflection identity and type assertions change at migration. The
 OTel successor also changes instrumentation scope to
-`github.com/faustbrian/go-rate-limit/adapters/otel`; dashboards and views that
+`github.com/faustbrian/go-rate-limit/v2/adapters/otel`; dashboards and views that
 select the legacy scope must be migrated explicitly.
 
 `ratelimitrpc` remains supported and is not deprecated. A JSON-RPC successor
