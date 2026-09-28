@@ -35,9 +35,13 @@ import (
 The legacy paths remain supported through the documented compatibility
 interval. Successors own their named Go types rather than aliasing legacy
 types, so reflection identity and type assertions change at migration. The
-OTel successor also changes instrumentation scope to
-`github.com/faustbrian/go-rate-limit/v2/adapters/otel`; dashboards and views that
-select the legacy scope must be migrated explicitly.
+OTel successor changes instrumentation scope from
+`github.com/faustbrian/go-rate-limit/adapters/otel` to
+`github.com/faustbrian/go-rate-limit/v2/adapters/otel`. The supported
+`ratelimittelemetry` adapter also changes scope from
+`github.com/faustbrian/go-rate-limit/ratelimittelemetry` to
+`github.com/faustbrian/go-rate-limit/v2/ratelimittelemetry`. Update dashboards
+and views that select either former scope.
 
 `ratelimitrpc` remains supported and is not deprecated. A JSON-RPC successor
 and its protocol/type redesign are deferred. `memory` also keeps its current
