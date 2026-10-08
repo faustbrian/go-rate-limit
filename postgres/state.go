@@ -196,7 +196,7 @@ func mutateStateMode(current *persistedState, request ratelimit.Request, strict 
 			switch current.Algorithm { //nolint:exhaustive // identity validation above restricts the value to the requested algorithm.
 			case ratelimit.TokenBucket:
 				if !validPersistedMicros(current.LastMicros) || current.Remainder > uint64(maxExactMicros) ||
-					current.Revision == request.Policy.Revision() && current.Remainder >= uint64(request.Policy.Period().Microseconds()) {
+					current.Revision == request.Policy.Revision() && current.Remainder >= uint64(request.Policy.Period().Microseconds()) /* #nosec G115 -- validated immutable token policy has a positive integral-microsecond period. */ {
 					return nil, ratelimit.Decision{}, ratelimit.ErrCorrupt
 				}
 				if current.Revision == request.Policy.Revision() && current.Tokens > request.Policy.Limit() {
@@ -370,11 +370,11 @@ func validLeaseDigest(digest string) bool {
 
 func mutateToken(current *persistedState, request ratelimit.Request) (ratelimit.Decision, error) {
 	now := request.Now.UnixMicro()
-	period := uint64(request.Policy.Period().Microseconds())
+	period := uint64(request.Policy.Period().Microseconds()) // #nosec G115 -- token dispatch supplies a validated positive integral-microsecond period.
 	elapsedDuration := time.UnixMicro(now).Sub(time.UnixMicro(current.LastMicros))
 	if elapsedDuration >= time.Microsecond {
 		if current.Tokens < request.Policy.Limit() {
-			elapsed := uint64(elapsedDuration.Microseconds())
+			elapsed := uint64(elapsedDuration.Microseconds()) // #nosec G115 -- the enclosing branch establishes elapsedDuration is at least one microsecond.
 			high, low := bits.Mul64(elapsed, request.Policy.Capacity())
 			low, carry := bits.Add64(low, current.Remainder, 0)
 			high, _ = bits.Add64(high, carry, 0)
@@ -415,7 +415,7 @@ func tokenDuration(tokens, remainder uint64, policy ratelimit.Policy) time.Durat
 	if tokens == 0 {
 		return 0
 	}
-	period := uint64(policy.Period().Microseconds())
+	period := uint64(policy.Period().Microseconds()) // #nosec G115 -- private token-only callers supply a validated positive integral-microsecond period.
 	high, low := bits.Mul64(tokens, period)
 	low, borrow := bits.Sub64(low, remainder, 0)
 	high, _ = bits.Sub64(high, 0, borrow)
@@ -534,7 +534,7 @@ func encodeState(state *persistedState) []byte {
 	wire := *state
 	if usesWindowMetadata(state.Algorithm) {
 		if state.PeriodMicros != 0 {
-			wire.Remainder = uint64(state.PeriodMicros)
+			wire.Remainder = uint64(state.PeriodMicros) // #nosec G115 -- private metadata is positive from validated policy or strict bounded decoding; legacy zero is skipped.
 			wire.LastMicros = 0
 			if state.Carried {
 				wire.LastMicros = 1

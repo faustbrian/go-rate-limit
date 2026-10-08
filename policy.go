@@ -114,7 +114,7 @@ func NewPolicy(spec PolicySpec) (Policy, error) {
 	default:
 		return Policy{}, fmt.Errorf("%w: unknown algorithm", ErrInvalidPolicy)
 	}
-	periodMicros := uint64(spec.Period.Microseconds())
+	periodMicros := uint64(spec.Period.Microseconds()) // #nosec G115 -- non-concurrency periods are validated positive; concurrency never consumes this unused value.
 	if spec.Algorithm != Concurrency &&
 		limit > maxExactInteger/periodMicros {
 		return Policy{}, fmt.Errorf("%w: limit and period exceed exact arithmetic bounds", ErrInvalidPolicy)

@@ -214,5 +214,5 @@ func loadStateStrict(ctx context.Context, tx nativeTransaction, key []byte, now 
 }
 
 func advisoryKey(key []byte) int64 {
-	return int64(binary.BigEndian.Uint64(key[:8]))
+	return int64(binary.BigEndian.Uint64(key[:8])) // #nosec G115 -- advisory lock identity intentionally retains every SHA-256 prefix bit, including the sign bit.
 }

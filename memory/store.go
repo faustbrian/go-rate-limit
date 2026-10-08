@@ -416,11 +416,11 @@ func refill(current *state, request ratelimit.Request) {
 		current.remainder = 0
 		return
 	}
-	elapsed := uint64(request.Now.Sub(current.lastRefill).Microseconds())
+	elapsed := uint64(request.Now.Sub(current.lastRefill).Microseconds()) // #nosec G115 -- the preceding Now.After guard establishes nonnegative elapsed microseconds.
 	high, low := bits.Mul64(elapsed, request.Policy.Capacity())
 	low, carry := bits.Add64(low, current.remainder, 0)
 	high, _ = bits.Add64(high, carry, 0)
-	period := uint64(request.Policy.Period().Microseconds())
+	period := uint64(request.Policy.Period().Microseconds()) // #nosec G115 -- token dispatch supplies a validated positive integral-microsecond period.
 	if high >= period {
 		current.tokens = request.Policy.Limit()
 		current.remainder = 0
@@ -441,7 +441,7 @@ func refillDuration(tokens, remainder uint64, policy ratelimit.Policy) time.Dura
 	if tokens == 0 {
 		return 0
 	}
-	high, low := bits.Mul64(tokens, uint64(policy.Period().Microseconds()))
+	high, low := bits.Mul64(tokens, uint64(policy.Period().Microseconds())) // #nosec G115 -- private token-only callers supply a validated positive integral-microsecond period.
 	low, borrow := bits.Sub64(low, remainder, 0)
 	high, _ = bits.Sub64(high, 0, borrow)
 	capacity := policy.Capacity()
