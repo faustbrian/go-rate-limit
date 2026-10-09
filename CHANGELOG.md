@@ -5,6 +5,12 @@ versioning after v1.0.0.
 
 ## Unreleased
 
+### Security
+
+- Run CI with Go 1.27.2 to include standard-library security fixes while
+  retaining Go 1.27.0 as the module minimum. Keep the reusable workflow and
+  source-built tooling pinned to the same compiler-compatible revision.
+
 ## 2.0.0 - 2026-09-28
 
 ### Changed

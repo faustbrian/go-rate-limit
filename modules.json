@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "repository": "github.com/faustbrian/go-rate-limit",
-  "go_version": "1.27.0",
+  "go_version": "1.27.2",
   "modules": [
     {
       "directory": ".",
@@ -285,7 +285,7 @@
         "supported_go": {
           "minimum": "1.27.0",
           "tested": [
-            "1.27.0"
+            "1.27.2"
           ]
         },
         "supported_platforms": [

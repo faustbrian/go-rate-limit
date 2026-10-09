@@ -16,7 +16,8 @@ and concurrency-lease policies with memory, native Valkey, and native
 PostgreSQL backends.
 
 The module lifecycle is **active** and its API maturity is **stable**. Go
-1.27.0 is both the minimum supported and continuously tested Go version.
+1.27.0 remains the minimum supported Go version. CI uses the patched Go
+1.27.2 runtime; applications should use the latest supported Go security patch.
 The v2 module path is `github.com/faustbrian/go-rate-limit/v2`. Once
 v2.0.0 is published, callers of the PostgreSQL `GoMigration` adapter
 must use it with the matching `go-migrations/v2` major version.
