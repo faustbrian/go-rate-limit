@@ -7,9 +7,11 @@ versioning after v1.0.0.
 
 ### Changed
 
-- Align OpenTelemetry modules at v1.45.0 for metric aggregation fixes and
-  the SDK endpoint-configuration disclosure fix (GHSA-8wmf-6v46-5gfg).
-  Existing observer scopes, metric names, and attributes remain unchanged.
+- Align OpenTelemetry modules at v1.46.0, retaining metric aggregation
+  fixes and the SDK endpoint-configuration disclosure fix
+  (GHSA-8wmf-6v46-5gfg). Characterize lazy attribute filtering with
+  caller-configured views while preserving observer scopes, metric names,
+  and emitted attributes.
 - Update the PostgreSQL driver to pgx v5.11.0. Pools remain caller-owned;
   review pgx's libpq-compatible connection-string changes when configuring
   them. Custom pgx.Rows implementations now require TypeMap, and text
