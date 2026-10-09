@@ -5,6 +5,15 @@ versioning after v1.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Update the PostgreSQL driver to pgx v5.11.0. Pools remain caller-owned;
+  review pgx's libpq-compatible connection-string changes when configuring
+  them. Custom pgx.Rows implementations now require TypeMap, and text
+  timestamptz scans use the client or configured scan location without
+  changing the represented instant.
+
+
 ### Security
 
 - Run CI with Go 1.27.2 to include standard-library security fixes while
