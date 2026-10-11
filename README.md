@@ -3,7 +3,7 @@
 [![CI](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/badge/CodeQL-required-blue)](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-100%25_required-blue)](CONTRIBUTING.md#verification)
-[![Mutation](https://img.shields.io/badge/mutation-100%25_required-blue)](CONTRIBUTING.md#verification)
+[![Mutation](https://img.shields.io/badge/mutation-local_and_scheduled-blue)](CONTRIBUTING.md#verification)
 [![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit/v2.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit/v2)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-rate-limit?sort=semver)](https://github.com/faustbrian/go-rate-limit/releases)
@@ -102,18 +102,16 @@ for the shared design language this module follows.
 
 ## Local verification
 
-    make unit
-    make cohesion
-    make check
+    go test ./...
 
-Exact production coverage and live integration need disposable services:
+With the qualified public verifier, `make check` and `make ci` select bounded
+local checks; `make check-full` preserves explicit full assurance. The manifest
+requires PostgreSQL and Valkey, so the service-aware Make route is distinct
+from Go tests that skip live backends without their environment variables.
 
-    VALKEY_ADDRESS=127.0.0.1:6379 \
-    POSTGRES_URL='postgres://postgres:postgres@127.0.0.1:5432/rate_limit?sslmode=disable' \
-    make check
-
-No core admission call sleeps or retries. See [CONTRIBUTING.md](CONTRIBUTING.md)
-for the full local gate stack.
+No core admission call sleeps or retries. See [CONTRIBUTING.md](CONTRIBUTING.md#verification)
+for focused fuzzing, optional local mutation, disposable-service integration
+and release boundaries.
 
 ## License
 

@@ -1,6 +1,6 @@
 schema_version: 1
-tool_version: v1.4.0
-tool_checksums_sha256: ba1b71d41dc9b58d5bfb411bc89ae2d45b6f3f778152714bfd1afeab0bef2f33
+tool_version: v2.1.1
+tool_checksums_sha256: 4e0a38f76cbff547541f3164a0e59e958cf2f62d7b5cea19d7a4d1c51fe5e977
 
 manifest:
   modules: modules.json
@@ -40,6 +40,16 @@ api:
         - ./valkey
 
 operations:
+  # Cancellation must leave admission/lease state and the lock owner intact.
+  - module: .
+    gate: local-test
+    steps:
+      - type: go-test
+        packages: [./memory]
+        run: '^Test(AdmitStrictCancellationInterruptsLockWait|StrictMemoryCancellationAfterLockDoesNotMutate|StrictMemoryLeaseLockWaitCancellation)$'
+        race: true
+        count: 1
+        timeout: 2m
   - module: .
     gate: docs
     steps:
