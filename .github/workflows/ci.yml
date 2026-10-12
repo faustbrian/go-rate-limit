@@ -20,9 +20,9 @@ permissions:
 
 jobs:
   ci:
-    uses: faustbrian/go-library-tools/.github/workflows/library-ci.yml@eff8b2127c361ee2f422123824a1d337cc277ac4
+    uses: faustbrian/go-library-tools/.github/workflows/library-ci.yml@d38bf31e7403501075442de9fde78f9479052996 # v2.3.0
     with:
-      tooling_sha: eff8b2127c361ee2f422123824a1d337cc277ac4
+      tooling_sha: d38bf31e7403501075442de9fde78f9479052996
       source_bootstrap: false
       public_dependencies: true
       release_dry_run: ${{ inputs.release_dry_run || false }}
