@@ -25,7 +25,9 @@ type Observer struct {
 	duration  metric.Float64Histogram
 }
 
-// New constructs instruments after panic-safe provider validation.
+// New rejects nil/typed-nil providers, then synchronously constructs two
+// instruments. Provider panics propagate and instrument errors are returned.
+// It retains instruments, not the provider, and owns no shutdown/export worker.
 func New(options Options) (*Observer, error) {
 	if nilInterface(options.MeterProvider) {
 		return nil, fmt.Errorf("%w: meter provider is required", ratelimit.ErrInvalidPolicy)
@@ -42,7 +44,9 @@ func New(options Options) (*Observer, error) {
 	return &Observer{decisions: decisions, duration: duration}, nil
 }
 
-// Observe records one bounded decision and its duration.
+// Observe records synchronously using context.Background; nil/zero observers
+// are no-ops. Direct observations are not label-validated or redacted beyond
+// classifying Err. Instrument panics propagate unless a service isolates them.
 func (observer *Observer) Observe(observation ratelimit.Observation) {
 	if observer == nil || observer.decisions == nil || observer.duration == nil {
 		return

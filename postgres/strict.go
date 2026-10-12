@@ -18,7 +18,9 @@ import (
 // StrictOptions configures strict PostgreSQL operations and owned rollback cleanup.
 type StrictOptions struct {
 	Options
-	// RollbackTimeout bounds synchronous cleanup after transaction ownership.
+	// RollbackTimeout is a positive budget starting at transaction ownership,
+	// not a fresh duration when rollback starts. Cleanup detaches cancellation
+	// while retaining context values; callers must provision enough total time.
 	RollbackTimeout time.Duration
 }
 
@@ -38,7 +40,9 @@ func NewStrict(pool *pgxpool.Pool, options StrictOptions) (*Store, error) {
 	return store, nil
 }
 
-// OpenStrict constructs a strict Store and checks its schema.
+// OpenStrict constructs a strict Store and checks table existence with the
+// caller context. It leaves the borrowed pool open even on failure; this is not
+// verification of the complete schema or application of a migration.
 func OpenStrict(ctx context.Context, pool *pgxpool.Pool, options StrictOptions) (*Store, error) {
 	return openStrictChecked(ctx, func() (*Store, error) { return NewStrict(pool, options) })
 }
@@ -57,7 +61,10 @@ func openStrictChecked(ctx context.Context, construct func() (*Store, error)) (*
 	return store, nil
 }
 
-// AdmitStrict evaluates one request with explicit transaction outcomes.
+// AdmitStrict evaluates under a per-key advisory transaction lock and row lock.
+// Options.Timeout bounds operational calls. Begin/commit failure may be unknown;
+// every owned non-commit exit rolls back synchronously, and rollback failure
+// replaces a known failure with unknown. The borrowed pool remains caller-owned.
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error) {
 	if err := store.strictReady(ctx); err != nil {
 		return ratelimit.Decision{}, err
@@ -127,7 +134,8 @@ func (store *Store) ReleaseStrict(ctx context.Context, lease ratelimit.Lease) er
 	return native.releaseStrict(callCtx, key[:], lease, hex.EncodeToString(digest[:]), store.rollbackTimeout)
 }
 
-// CheckStrict verifies the package-owned schema without mutation.
+// CheckStrict verifies table existence without mutation under the caller
+// context, not Options.Timeout. It does not authenticate schema definitions.
 func (store *Store) CheckStrict(ctx context.Context) error {
 	if err := store.strictReady(ctx); err != nil {
 		return err
@@ -149,7 +157,9 @@ func (store *Store) CheckStrict(ctx context.Context) error {
 	return nil
 }
 
-// CleanupStrict deletes a bounded expired-state batch with explicit outcome semantics.
+// CleanupStrict deletes at most MaxCleanupBatch expired rows under the caller
+// context, without Options.Timeout or detached rollback. Failure after statement
+// dispatch is unknown because rows may already have been removed.
 func (store *Store) CleanupStrict(ctx context.Context, batch int) (int64, error) {
 	if err := store.strictReady(ctx); err != nil {
 		return 0, err
@@ -273,6 +283,8 @@ func (executor *nativeExecutor) beginLockedStrict(ctx context.Context, key []byt
 	return tx, now, rollbackDeadline, nil
 }
 
+// rollbackStrict uses the original ownership deadline: a slow operation cannot
+// obtain a new cleanup budget after consuming the configured one.
 func rollbackStrict(ctx context.Context, tx nativeTransaction, deadline time.Time) error {
 	rollbackCtx, cancel := context.WithDeadline(context.WithoutCancel(ctx), deadline)
 	defer cancel()

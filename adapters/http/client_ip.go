@@ -40,7 +40,11 @@ func NewClientIPExtractor(options ClientIPOptions) (*ClientIPExtractor, error) {
 	return &ClientIPExtractor{trusted: trusted}, nil
 }
 
-// ClientIP returns the rightmost untrusted address, or the direct peer.
+// ClientIP rejects nil/zero extractors and nil requests. It ignores forwarding
+// from untrusted peers; for trusted peers it parses all hops (at most 4096 bytes
+// and 32 addresses) before selecting the rightmost untrusted or leftmost if all
+// are trusted. Header.Get selects the first X-Forwarded-For line. Configure
+// proxies that strip spoofed metadata; this is not header authentication.
 func (extractor *ClientIPExtractor) ClientIP(request *http.Request) (netip.Addr, error) {
 	if extractor == nil || extractor.trusted == nil {
 		return netip.Addr{}, fmt.Errorf("%w: extractor is nil or uninitialized", ErrInvalidClientIP)

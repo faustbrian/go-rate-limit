@@ -15,9 +15,10 @@ const (
 
 // Subject is a typed identity input used only to derive a bounded Key.
 type Subject struct {
-	// Kind is a bounded, low-cardinality subject category.
+	// Kind is a syntactically bounded subject category; callers control cardinality.
 	Kind string
-	// Value is the identity value and should normally be irreversibly hashed.
+	// Value is a 1..MaxSubjectBytes-byte identity input. Avoid raw secrets even
+	// when hashing: deterministic hashes permit guesses of low-entropy values.
 	Value string
 }
 
@@ -29,17 +30,22 @@ type KeySpec struct {
 	Version string
 	// Subject supplies the typed identity.
 	Subject Subject
-	// Hash irreversibly hashes Subject.Value before storage and observation.
+	// Hash derives a SHA-256 digest from namespace, version, kind and value.
+	// False persists the raw value; neither mode is encryption or authentication.
 	Hash bool
 }
 
-// Key is a validated, bounded backend key with a safe subject kind.
+// Key is an immutable, validated backend key. Its zero value is invalid.
+// Subject kind is syntactically bounded, not verified to be low-cardinality.
 type Key struct {
 	value       string
 	subjectKind string
 }
 
-// NewKey validates and derives a namespaced key from spec.
+// NewKey validates and derives a namespaced key from spec. Namespace, version
+// and kind are 1..48 lowercase ASCII letters, digits, hyphens or underscores.
+// Unhashed values may not contain braces, NUL, CR or LF. Hashing domain-separates
+// the components with NUL bytes; callers own subject authenticity and privacy.
 func NewKey(spec KeySpec) (Key, error) {
 	if !validKeyPart(spec.Namespace) || !validKeyPart(spec.Version) ||
 		!validKeyPart(spec.Subject.Kind) || spec.Subject.Value == "" ||
@@ -74,8 +80,9 @@ func validKeyPart(value string) bool {
 	return true
 }
 
-// String returns the bounded persisted representation.
+// String returns namespace:version:kind:value, or empty for a zero Key.
+// With Hash false this includes the raw subject; do not log it as safe metadata.
 func (k Key) String() string { return k.value }
 
-// SubjectKind returns the safe, low-cardinality subject category.
+// SubjectKind returns the syntactically bounded category, or empty for a zero Key.
 func (k Key) SubjectKind() string { return k.subjectKind }

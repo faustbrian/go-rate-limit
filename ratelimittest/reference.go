@@ -9,7 +9,11 @@ import (
 	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
-// Reference is a mutex-protected rational-arithmetic algorithm model.
+// Reference is a mutex-protected rational-arithmetic algorithm model. Use
+// NewReference and do not copy it after use. Its key map has no cardinality
+// bound or automatic sweeping; it is a test oracle, not a production store.
+// Sliding windows share the production 16-segment approximation, so this is
+// not an independent proof of an exact rolling-log algorithm.
 type Reference struct {
 	mu     contextMutex
 	states map[string]*referenceState

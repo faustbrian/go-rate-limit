@@ -10,7 +10,10 @@ import (
 	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
-// AdmitStrict evaluates one request with explicit cancellation outcomes.
+// AdmitStrict uses context-interruptible shard locking and rechecks cancellation
+// after acquisition before mutation. Clock rollback is clamped per key. Strict
+// fixed/sliding policies reject a same-ID period change rather than reinterpret
+// retained usage; capacity revisions preserve consumption.
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error) {
 	if store == nil || len(store.shards) == 0 {
 		return ratelimit.Decision{}, fmt.Errorf("%w: backend is nil or uninitialized", ratelimit.ErrInvalidPolicy)
@@ -62,7 +65,9 @@ func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) 
 	return strictDecisionResult(decision, err, effective)
 }
 
-// AcquireStrict obtains one lease with explicit cancellation outcomes.
+// AcquireStrict validates and waits with the caller context, then rechecks it
+// under the lock. Expired leases are pruned using the effective request clock;
+// idempotent active retries preserve original ownership and expiry.
 func (store *Store) AcquireStrict(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error) {
 	if store == nil || len(store.shards) == 0 {
 		return ratelimit.Lease{}, ratelimit.Decision{}, fmt.Errorf("%w: backend is nil or uninitialized", ratelimit.ErrInvalidPolicy)

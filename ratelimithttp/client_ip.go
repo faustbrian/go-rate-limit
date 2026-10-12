@@ -45,7 +45,11 @@ func NewClientIPExtractor(options ClientIPOptions) (*ClientIPExtractor, error) {
 	return &ClientIPExtractor{trusted: trusted}, nil
 }
 
-// ClientIP returns the rightmost untrusted address, or the direct peer.
+// ClientIP returns the direct peer when untrusted; trusted peers may provide
+// at most 4096 bytes and 32 forwarded addresses. All addresses are parsed before
+// selecting the rightmost untrusted, or leftmost when all are trusted. Header.Get
+// uses the first header line. Nil receiver/request behavior remains unchecked;
+// trusted proxies must strip spoofed forwarding metadata.
 func (extractor *ClientIPExtractor) ClientIP(request *http.Request) (netip.Addr, error) {
 	peer, err := parseRemoteAddr(request.RemoteAddr)
 	if err != nil {

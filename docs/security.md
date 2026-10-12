@@ -16,20 +16,26 @@ Controls:
 - arguments passed separately from Lua source, preventing script injection;
 - schema and algorithm validation before persisted state is trusted;
 - cost-bound lease identity so one LeaseID cannot alias different ownership;
-- bounded cardinality, TTLs, 16 sliding segments, cleanup batches, and leases;
-- controlled telemetry labels and classified logging without raw backend text;
+- per-shard memory cardinality, backend TTLs, 16 sliding segments, cleanup
+  batches, and leases (not a universal total-memory or authority guarantee);
+- syntactically bounded service metadata and classified logging without raw
+  backend text; direct adapter observations require caller label validation;
 - stable public error classifications that discard driver and backend detail;
 - fail-open limited to availability and deadline failures, never integrity;
 - generic transport rejection responses.
 
-Public backend and service errors intentionally do not wrap driver errors.
+Package-owned backend errors intentionally do not wrap driver errors. Strict
+services reject unsafe custom-backend errors; the compatibility Service
+preserves
+custom rejection results, so custom implementers must avoid raw error detail.
 Driver text can contain connection strings, credentials, raw commands, or
 attacker-controlled state. Capture detailed backend diagnostics only inside a
 separately secured infrastructure boundary; application logs and responses
 should record the stable error class and bounded decision metadata.
 
-SHA-256 hashing is irreversible key minimization, not encryption. Low-entropy
-subjects may still be guessed; use a deployment-specific HMAC in a custom key
+SHA-256 hashing is deterministic key minimization, not encryption or anonymity.
+Low-entropy subjects may still be guessed; use a deployment-specific HMAC in a
+custom key
 function when offline enumeration is a concern.
 
 Report vulnerabilities according to [../SECURITY.md](../SECURITY.md).

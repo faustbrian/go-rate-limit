@@ -68,7 +68,8 @@ type PolicySpec struct {
 	MaxCost uint64
 	// FailureMode controls backend outage behavior.
 	FailureMode FailureMode
-	// Consistency declares the required coordination scope.
+	// Consistency declares the required coordination scope; services do not
+	// negotiate or enforce backend capability.
 	Consistency Consistency
 	// Lease is the maximum concurrency lease duration.
 	Lease time.Duration
@@ -88,7 +89,11 @@ type Policy struct {
 	lease       time.Duration
 }
 
-// NewPolicy validates spec and returns an immutable policy.
+// NewPolicy validates spec and returns an immutable policy; its zero value is
+// invalid. IDs and revisions are 1..64 bytes from letters, digits and -_.:.
+// The selected period/lease requires positive integral microseconds. Limits and refill
+// products must fit the exact integer range shared with Lua. Concurrency cannot
+// fail open and has at most MaxConcurrencyLeases units. No backend is contacted.
 func NewPolicy(spec PolicySpec) (Policy, error) {
 	if !validPolicyIdentifier(spec.ID, MaxPolicyIDBytes) ||
 		!validPolicyIdentifier(spec.Revision, MaxPolicyRevisionBytes) ||

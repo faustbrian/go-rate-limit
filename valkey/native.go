@@ -63,7 +63,9 @@ func openChecked(ctx context.Context, store *Store, err error) (*Store, error) {
 	return store, nil
 }
 
-// Check requires Valkey 9 or newer and a noeviction memory policy.
+// Check requires Valkey 9 or newer and observes noeviction with the caller
+// context, not Options.Timeout. It does not keep watching configuration or
+// establish failover durability. Client lifetime remains caller-owned.
 func (store *Store) Check(ctx context.Context) error {
 	native, ok := store.executor.(*nativeExecutor)
 	if !ok {

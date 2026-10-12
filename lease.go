@@ -14,7 +14,8 @@ const MaxLeaseIDBytes = 128
 type LeaseRequest struct {
 	// Request must use a Concurrency policy.
 	Request Request
-	// LeaseID is an idempotent, caller-generated bounded identifier.
+	// LeaseID is a 1..MaxLeaseIDBytes-byte caller-generated identity. Reuse
+	// while active is idempotent only with matching cost; it does not renew expiry.
 	LeaseID string
 }
 
@@ -30,7 +31,10 @@ func (request LeaseRequest) Validate() error {
 	return nil
 }
 
-// Lease is proof of weighted concurrency ownership until ExpiresAt or release.
+// Lease records weighted concurrency ownership until ExpiresAt or release.
+// Fields are public and forgeable: possession is not authenticated authorization
+// or a fence for application side effects. Copy the value; do not mutate it
+// between acquisition and release.
 type Lease struct {
 	// ID is the caller-generated lease identity.
 	ID string
@@ -42,7 +46,8 @@ type Lease struct {
 	PolicyRevision string
 	// Cost is the held concurrency weight.
 	Cost uint64
-	// ExpiresAt is the automatic release boundary.
+	// ExpiresAt is the logical expiry boundary. Backends prune on later work,
+	// explicit sweeping or state TTL; no callback stops application work.
 	ExpiresAt time.Time
 	// Backend identifies the implementation that created the lease.
 	Backend string

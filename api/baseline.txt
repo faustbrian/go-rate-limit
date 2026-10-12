@@ -4,8 +4,16 @@ Package ratelimit defines transport-neutral admission policies, requests,
 decisions, observations, batching, and concurrency leases.
 
 The package performs no sleeping or retry orchestration. Backends implement
-atomic state changes, while Service applies the policy's explicit failure mode
-and emits bounded observations.
+atomic state changes, while Service applies the policy's explicit failure
+mode and emits observations. StrictService validates explicit backend outcome
+declarations and never fails open on an unknown mutation result. Service retains
+its released compatibility behavior and does not validate those declarations.
+Neither service owns backend shutdown or application retries.
+
+Policy consistency is a declaration, not backend selection or verification.
+Callers choose the authority and supply time, non-secret policy labels and keys.
+Leases account for capacity; they do not authenticate callers or fence
+application side effects after expiry.
 
 CONSTANTS
 
@@ -76,7 +84,8 @@ FUNCTIONS
 
 func CanceledOutcome() error
     CanceledOutcome constructs a bounded declaration that dispatch did not
-    occur.
+    occur. It matches ErrCanceled, context.Canceled and, for compatibility,
+    ErrDeadline. A backend is responsible for the truth of this declaration.
 
 func DeadlineOutcome() error
     DeadlineOutcome constructs a bounded deadline declaration that dispatch did
@@ -84,7 +93,9 @@ func DeadlineOutcome() error
 
 func UnknownOutcome(contextCategory error) error
     UnknownOutcome constructs a bounded declaration that dispatch may have
-    occurred.
+    occurred. Only direct context.Canceled or context.DeadlineExceeded adds
+    a classification; the supplied error, its text, cause and tree are not
+    retained or traversed.
 
 
 TYPES
@@ -117,7 +128,9 @@ type Backend interface {
 	// Admit atomically consumes capacity or returns ErrRejected.
 	Admit(context.Context, Request) (Decision, error)
 }
-    Backend atomically evaluates admission requests within its documented scope.
+    Backend evaluates admission requests within its documented atomicity scope.
+    The caller owns its lifetime and concurrent-use safety. Method panics are
+    not recovered by services; strict outcome semantics require StrictBackend.
 
 type BackendError struct {
 	// Has unexported fields.
@@ -127,6 +140,9 @@ type BackendError struct {
 
 func NewBackendError(category error) (*BackendError, error)
     NewBackendError validates and retains one direct safe backend category.
+    Wrapped categories and arbitrary errors are rejected without retaining
+    their text. A category accepted here may still be inapplicable to a service
+    method.
 
 func (err *BackendError) Category() error
     Category returns the retained stable category.
@@ -160,7 +176,8 @@ func (err *BatchItemError) Unwrap() error
     Unwrap returns the normalized item error.
 
 type BatchRequest struct {
-	// Requests contains between one and MaxBatchSize attempts.
+	// Requests contains between one and MaxBatchSize attempts. The slice is
+	// borrowed during Batch; do not mutate it concurrently.
 	Requests []Request
 	// Atomicity must be AtomicityPerItem.
 	Atomicity Atomicity
@@ -194,7 +211,11 @@ type Decision struct {
 	// PolicyRevision identifies the admission semantics used.
 	PolicyRevision string
 }
-    Decision describes the complete, observable result of admission.
+    Decision describes admission metadata. Check the accompanying error before
+    proceeding; zero values are not successful admission. Remaining and retry
+    times are snapshots, not reservations against concurrent calls or clock
+    skew. StrictService validates result shape; Service preserves legacy backend
+    data.
 
 type FailureMode uint8
     FailureMode controls the decision returned when a backend cannot decide.
@@ -208,16 +229,23 @@ const (
 type Key struct {
 	// Has unexported fields.
 }
-    Key is a validated, bounded backend key with a safe subject kind.
+    Key is an immutable, validated backend key. Its zero value is invalid.
+    Subject kind is syntactically bounded, not verified to be low-cardinality.
 
 func NewKey(spec KeySpec) (Key, error)
-    NewKey validates and derives a namespaced key from spec.
+    NewKey validates and derives a namespaced key from spec. Namespace,
+    version and kind are 1..48 lowercase ASCII letters, digits, hyphens or
+    underscores. Unhashed values may not contain braces, NUL, CR or LF.
+    Hashing domain-separates the components with NUL bytes; callers own subject
+    authenticity and privacy.
 
 func (k Key) String() string
-    String returns the bounded persisted representation.
+    String returns namespace:version:kind:value, or empty for a zero Key. With
+    Hash false this includes the raw subject; do not log it as safe metadata.
 
 func (k Key) SubjectKind() string
-    SubjectKind returns the safe, low-cardinality subject category.
+    SubjectKind returns the syntactically bounded category, or empty for a zero
+    Key.
 
 type KeySpec struct {
 	// Namespace isolates applications or package consumers.
@@ -226,7 +254,8 @@ type KeySpec struct {
 	Version string
 	// Subject supplies the typed identity.
 	Subject Subject
-	// Hash irreversibly hashes Subject.Value before storage and observation.
+	// Hash derives a SHA-256 digest from namespace, version, kind and value.
+	// False persists the raw value; neither mode is encryption or authentication.
 	Hash bool
 }
     KeySpec describes a namespaced and versioned admission key.
@@ -242,12 +271,16 @@ type Lease struct {
 	PolicyRevision string
 	// Cost is the held concurrency weight.
 	Cost uint64
-	// ExpiresAt is the automatic release boundary.
+	// ExpiresAt is the logical expiry boundary. Backends prune on later work,
+	// explicit sweeping or state TTL; no callback stops application work.
 	ExpiresAt time.Time
 	// Backend identifies the implementation that created the lease.
 	Backend string
 }
-    Lease is proof of weighted concurrency ownership until ExpiresAt or release.
+    Lease records weighted concurrency ownership until ExpiresAt or release.
+    Fields are public and forgeable: possession is not authenticated
+    authorization or a fence for application side effects. Copy the value;
+    do not mutate it between acquisition and release.
 
 type LeaseBackend interface {
 	// Acquire creates or idempotently returns a weighted lease.
@@ -260,7 +293,8 @@ type LeaseBackend interface {
 type LeaseRequest struct {
 	// Request must use a Concurrency policy.
 	Request Request
-	// LeaseID is an idempotent, caller-generated bounded identifier.
+	// LeaseID is a 1..MaxLeaseIDBytes-byte caller-generated identity. Reuse
+	// while active is idempotent only with matching cost; it does not renew expiry.
 	LeaseID string
 }
     LeaseRequest requests weighted concurrency admission under a unique lease
@@ -278,18 +312,24 @@ type Observation struct {
 	Decision Decision
 	// Err is the stable error returned to the caller, if any.
 	Err error
-	// Duration is local service processing time.
+	// Duration is local service processing time before observer fan-out. It
+	// excludes downstream application work and observer blocking.
 	Duration time.Duration
 }
-    Observation contains bounded decision metadata for logging and telemetry.
+    Observation contains admission metadata. Services omit the raw key/subject.
+    Direct construction is not validated: callers must bound labels and avoid
+    secrets, especially when passing observations directly to adapters.
 
 type ObserveFunc func(Observation)
     ObserveFunc adapts a function to Observer.
 
 func (function ObserveFunc) Observe(observation Observation)
-    Observe calls function with observation.
+    Observe calls function with observation; a nil function panics. Services
+    isolate this panic, whereas direct calls propagate it.
 
 type Observer interface {
+	// Observe consumes one value synchronously. Implementations own sink
+	// concurrency and blocking; services isolate panics but impose no timeout.
 	Observe(Observation)
 }
     Observer consumes bounded admission observations.
@@ -300,7 +340,12 @@ type Policy struct {
     Policy is an immutable, validated admission policy.
 
 func NewPolicy(spec PolicySpec) (Policy, error)
-    NewPolicy validates spec and returns an immutable policy.
+    NewPolicy validates spec and returns an immutable policy; its zero value is
+    invalid. IDs and revisions are 1..64 bytes from letters, digits and -_.:.
+    The selected period/lease requires positive integral microseconds.
+    Limits and refill products must fit the exact integer range shared with Lua.
+    Concurrency cannot fail open and has at most MaxConcurrencyLeases units.
+    No backend is contacted.
 
 func (p Policy) Algorithm() Algorithm
     Algorithm returns the policy algorithm.
@@ -352,7 +397,8 @@ type PolicySpec struct {
 	MaxCost uint64
 	// FailureMode controls backend outage behavior.
 	FailureMode FailureMode
-	// Consistency declares the required coordination scope.
+	// Consistency declares the required coordination scope; services do not
+	// negotiate or enforce backend capability.
 	Consistency Consistency
 	// Lease is the maximum concurrency lease duration.
 	Lease time.Duration
@@ -387,38 +433,57 @@ type Request struct {
 	Key Key
 	// Cost is the positive number of units requested.
 	Cost uint64
-	// Now is the caller-supplied current time used by client-clock backends.
+	// Now is required even with server-clock backends. Client-clock backends
+	// use its microsecond-normalized instant and clamp backward movement per key.
 	Now time.Time
 }
     Request is a weighted admission attempt evaluated at an explicit time.
 
 func (r Request) Validate() error
-    Validate checks that all request inputs are present and bounded by Policy.
+    Validate checks policy/key presence, positive Cost within MaxCost and a
+    nonzero Now inside the exact Unix-microsecond range with room for the policy
+    duration. It does not validate backend capability or clock synchronization.
 
 type Service struct {
 	// Has unexported fields.
 }
-    Service validates requests, applies failure behavior, and emits
-    observations.
+    Service validates requests, applies compatibility failure behavior,
+    and emits observations. Use NewService and a non-nil context; a zero or
+    nil Service is not usable. It owns no clients, goroutines or shutdown.
+    Concurrent calls may invoke the borrowed backend and observers concurrently.
 
 func NewService(backend Backend, observers ...Observer) (*Service, error)
-    NewService constructs an admission service using backend and observers.
+    NewService constructs a service, filtering nil observers up to MaxObservers.
+    It calls backend.Name during construction and again during operations.
+    Typed nil backends are not rejected; use NewStrictService for strict nil
+    validation.
 
 func (service *Service) Acquire(ctx context.Context, request LeaseRequest) (lease Lease, decision Decision, err error)
     Acquire validates and atomically obtains a concurrency lease.
 
 func (service *Service) Admit(ctx context.Context, request Request) (decision Decision, err error)
-    Admit evaluates one request without sleeping or retrying.
+    Admit evaluates one request synchronously without sleeping or retrying.
+    Backend success/rejection results are not checked for completeness. Other
+    errors are normalized; non-concurrency FailOpen can admit on availability
+    or deadline errors without knowing whether a backend mutation occurred.
+    Observer calls are synchronous with panics isolated, but blocking is not
+    time-bounded.
 
 func (service *Service) Batch(ctx context.Context, batch BatchRequest) (BatchDecision, error)
-    Batch evaluates a bounded list with per-item atomicity and no hidden
-    retries.
+    Batch validates all inputs before any dispatch, then processes every item
+    independently in order with no rollback or hidden retries. It does not
+    stop the loop on cancellation; each Admit/backend applies its own context
+    behavior. The returned decisions are caller-owned and item errors are
+    joined.
 
 func (service *Service) Release(ctx context.Context, lease Lease) error
     Release relinquishes a lease through the backend that owns it.
 
 type StrictBackend interface {
 	Backend
+	// AdmitStrict returns a complete allowed/rejected result or a direct
+	// outcome declaration/safe category applicable to admission. Wrapping such
+	// errors does not establish a trusted declaration for StrictService.
 	AdmitStrict(context.Context, Request) (Decision, error)
 }
     StrictBackend exposes explicit dispatch-outcome declarations.
@@ -426,7 +491,8 @@ type StrictBackend interface {
 type StrictBatchDecision struct {
 	// Decisions has exactly one position per input request.
 	Decisions []Decision
-	// Attempted contains the ordered indexes dispatched to the backend.
+	// Attempted contains the ordered indexes dispatched to the backend. The
+	// returned slice is caller-owned; zero decisions may be unattempted.
 	Attempted []int
 	// Atomicity records the validated batch atomicity mode.
 	Atomicity Atomicity
@@ -450,7 +516,11 @@ func (err *StrictBatchError) Unwrap() []error
 
 type StrictLeaseBackend interface {
 	StrictBackend
+	// AcquireStrict returns a complete owned lease and decision on success,
+	// or an explicit failure declaration with zero lease.
 	AcquireStrict(context.Context, LeaseRequest) (Lease, Decision, error)
+	// ReleaseStrict releases matching ownership or returns a method-applicable
+	// direct category/outcome declaration; ambiguity must not imply release.
 	ReleaseStrict(context.Context, Lease) error
 }
     StrictLeaseBackend exposes strict admission and lease lifecycle operations.
@@ -459,28 +529,48 @@ type StrictService struct {
 	// Has unexported fields.
 }
     StrictService validates complete backend results and fails closed on
-    ambiguity.
+    ambiguity. Construct it with NewStrictService; nil/zero receivers and
+    nil contexts are rejected. Collaborators are borrowed, may be called
+    concurrently, and are not closed. Backend panics propagate; observer panics
+    alone are isolated.
 
 func NewStrictService(backend StrictBackend, observers ...Observer) (*StrictService, error)
-    NewStrictService constructs a strict service without invoking backend
-    operations.
+    NewStrictService rejects nil/typed-nil backends and typed-nil observers,
+    filters nil observers, and caches one validated backend.Name call. That
+    call may panic; no admission operation is invoked and no client lifetime is
+    owned.
 
 func (service *StrictService) Acquire(ctx context.Context, request LeaseRequest) (Lease, Decision, error)
-    Acquire validates and obtains one strict concurrency lease.
+    Acquire validates and obtains one strict concurrency lease. A complete known
+    result wins racing cancellation; incomplete lease/result pairs are unknown
+    and fail closed. Concurrency never fails open and backends own expiry
+    semantics.
 
 func (service *StrictService) Admit(ctx context.Context, request Request) (Decision, error)
-    Admit validates and executes one strict admission request.
+    Admit validates and executes one strict admission request. A complete known
+    result wins a racing cancellation. Unknown or malformed results fail closed;
+    only known pre-dispatch deadlines or safe availability failures can fail
+    open for a non-concurrency policy. No unsafe error tree is traversed or
+    formatted.
 
 func (service *StrictService) Batch(ctx context.Context, batch BatchRequest) (StrictBatchDecision, error)
-    Batch evaluates a validated per-item batch with structured failures.
+    Batch validates every item before dispatch, then evaluates in order
+    without rollback. Cancellation/deadline before dispatch stops the suffix;
+    an ambiguous attempted item plus caller cancellation also stops it.
+    Completed effects remain. Decisions and Attempted are caller-owned; errors
+    contain ordered item failures.
 
 func (service *StrictService) Release(ctx context.Context, lease Lease) error
     Release relinquishes one strict lease without observing or retaining it.
+    Nonempty Backend must match the cached name; empty Backend is accepted for
+    compatibility. Known success wins racing cancellation. Ownership fields are
+    checked, but the public Lease value is not cryptographic authorization.
 
 type Subject struct {
-	// Kind is a bounded, low-cardinality subject category.
+	// Kind is a syntactically bounded subject category; callers control cardinality.
 	Kind string
-	// Value is the identity value and should normally be irreversibly hashed.
+	// Value is a 1..MaxSubjectBytes-byte identity input. Avoid raw secrets even
+	// when hashing: deterministic hashes permit guesses of low-entropy values.
 	Value string
 }
     Subject is a typed identity input used only to derive a bounded Key.
@@ -489,6 +579,12 @@ package ratelimithttp // import "github.com/faustbrian/go-rate-limit/v2/adapters
 
 Package ratelimithttp provides strict inbound HTTP rate-limit middleware at
 github.com/faustbrian/go-rate-limit/v2/adapters/http.
+
+The middleware is synchronous and borrows callbacks, service and handler.
+Callbacks may block or panic and must support concurrent requests. Proxy trust
+is configured by network prefix; forwarded headers are trusted only from a
+trusted direct peer, not authenticated by this package. Admission does not own
+request-body buffering, outbound pacing, retries or application shutdown.
 
 CONSTANTS
 
@@ -513,7 +609,12 @@ func NewClientIPExtractor(options ClientIPOptions) (*ClientIPExtractor, error)
     NewClientIPExtractor validates and copies trusted proxy prefixes.
 
 func (extractor *ClientIPExtractor) ClientIP(request *http.Request) (netip.Addr, error)
-    ClientIP returns the rightmost untrusted address, or the direct peer.
+    ClientIP rejects nil/zero extractors and nil requests. It ignores forwarding
+    from untrusted peers; for trusted peers it parses all hops (at most 4096
+    bytes and 32 addresses) before selecting the rightmost untrusted or leftmost
+    if all are trusted. Header.Get selects the first X-Forwarded-For line.
+    Configure proxies that strip spoofed metadata; this is not header
+    authentication.
 
 type ClientIPOptions struct {
 	// TrustedProxies contains copied, validated network prefixes.
@@ -530,7 +631,12 @@ func New(options Options) (*Middleware, error)
     New validates options without invoking a downstream handler.
 
 func (middleware *Middleware) Wrap(next http.Handler) (http.Handler, error)
-    Wrap validates and wraps one downstream handler.
+    Wrap rejects nil/typed-nil handlers. Each call derives Key, Cost and Now
+    in order, then admits before invoking next once. Callbacks are borrowed,
+    may run concurrently and may block/panic; the middleware adds no deadline.
+    Derivation errors produce 400, rejection 429, and other admission failures
+    503. Reset and retry headers round nonnegative relative seconds upward,
+    not Unix timestamps.
 
 type Options struct {
 	// Service performs strict admission.
@@ -553,6 +659,11 @@ package ratelimitslog // import "github.com/faustbrian/go-rate-limit/v2/adapters
 Package ratelimitslog records bounded rate-limit observations with slog at
 github.com/faustbrian/go-rate-limit/v2/adapters/slog.
 
+The logger is borrowed and calls are synchronous with context.Background.
+Direct observation labels require caller validation; only error classification
+avoids raw error text. Nil/zero observers are no-ops. Service observer isolation
+contains panics, but direct sink calls propagate them and may block.
+
 TYPES
 
 type Observer struct {
@@ -564,7 +675,11 @@ func New(options Options) (*Observer, error)
     New validates options and constructs an Observer.
 
 func (observer *Observer) Observe(observation ratelimit.Observation)
-    Observe writes one bounded structured decision record.
+    Observe logs synchronously using context.Background; nil/zero observers
+    are no-ops. It emits an error category instead of backend text.
+    Direct Observation labels are unvalidated; callers own secrecy and sink
+    concurrency/lifetime. Sink panics propagate unless an enclosing service
+    isolates them.
 
 type Options struct {
 	// Logger receives bounded observation fields.
@@ -579,21 +694,37 @@ package ratelimitauthentication // import "github.com/faustbrian/go-rate-limit/v
 Package ratelimitauthentication derives strict rate-limit keys at
 github.com/faustbrian/go-rate-limit/v2/adapters/authentication.
 
+Key snapshots Subject once after nil validation. It does not perform
+authentication, establish tenant membership or prevent guesses of low-entropy
+hashed identities. The caller owns principal lifetime and concurrent-use safety;
+Subject method panics propagate.
+
 FUNCTIONS
 
 func Key(principal Principal) (ratelimit.Key, error)
-    Key derives a bounded hashed key from one validated subject snapshot.
+    Key rejects nil/typed-nil principals and reads Subject once to derive a
+    bounded SHA-256 key. It does not authenticate the principal or contain
+    Subject panics; callers own identity trust and concurrency. Hashing is not
+    encryption.
 
 
 TYPES
 
-type Principal interface{ Subject() string }
+type Principal interface {
+	// Subject returns an identity whose authenticity the caller has established.
+	Subject() string
+}
     Principal is the narrow identity contract required for key derivation.
 
 package ratelimitqueue // import "github.com/faustbrian/go-rate-limit/v2/adapters/queue"
 
 Package ratelimitqueue provides strict queue admission middleware at
 github.com/faustbrian/go-rate-limit/v2/adapters/queue.
+
+Deferral is a signal, not scheduling or acknowledgement. Callbacks run
+synchronously in Subject/Cost/Now order and the downstream handler runs only
+after admission. Message identity does not establish deduplication or tenant
+authorization. Callers own borrowed collaborator lifetime and concurrency.
 
 TYPES
 
@@ -611,6 +742,8 @@ func (deferred *Deferred) Unwrap() error
     Unwrap returns the normalized rejection cause.
 
 type Handler interface {
+	// Handle runs admitted application work. The queue integration owns
+	// acknowledgement, retry scheduling, cancellation and payload lifetime.
 	Handle(context.Context, Message) error
 }
     Handler processes an admitted queue message without owning acknowledgement.
@@ -624,16 +757,19 @@ func (function HandlerFunc) Handle(ctx context.Context, message Message) error
 type Message struct {
 	// ID is the durable message identifier.
 	ID string
-	// Queue is the bounded queue name.
+	// Queue is the caller-provided queue name.
 	Queue string
-	// Tenant is the bounded tenant identifier.
+	// Tenant is the caller-verified tenant identifier.
 	Tenant string
-	// Principal is the bounded authenticated subject.
+	// Principal is an identity whose authenticity the caller establishes.
 	Principal string
 	// Attempt is caller-owned delivery-attempt metadata.
 	Attempt uint64
 }
-    Message contains bounded queue admission inputs, not a durable payload.
+    Message contains caller-owned queue admission metadata, not a durable
+    payload. Its strings are not collectively validated or bounded; the selected
+    derived subject is bounded by NewKey. ID and Attempt do not provide
+    deduplication.
 
 type Middleware struct {
 	// Has unexported fields.
@@ -644,7 +780,10 @@ func New(options Options) (*Middleware, error)
     New validates options without invoking a downstream handler.
 
 func (middleware *Middleware) Wrap(next Handler) (Handler, error)
-    Wrap validates and wraps one downstream handler.
+    Wrap rejects nil/typed-nil handlers, then synchronously derives Subject,
+    Cost and Now in order before admission. No callback is retried or retained
+    per call. Deferral does not sleep or acknowledge; callbacks/handlers may run
+    concurrently and their panics propagate.
 
 type Options struct {
 	// Service performs strict admission.
@@ -667,12 +806,19 @@ func ByPrincipal() SubjectFunc
     ByPrincipal derives a required principal subject.
 
 func ByQueueAndTenant() SubjectFunc
-    ByQueueAndTenant derives an unambiguous composite subject.
+    ByQueueAndTenant length-prefixes Queue in bytes, making the composite
+    unambiguous even with colons. Empty parts fail; NewKey later enforces size.
+    This does not authenticate tenant membership.
 
 package ratelimitotel // import "github.com/faustbrian/go-rate-limit/v2/adapters/otel"
 
 Package ratelimitotel records bounded rate-limit metrics with OpenTelemetry at
 github.com/faustbrian/go-rate-limit/v2/adapters/otel.
+
+Instrument creation and recording are synchronous; no exporter, global provider
+or shutdown is owned. Direct observations can contain arbitrary labels and are
+not sanitized by these instruments. Only error classification omits raw error
+text. Nil/zero observers are no-ops; sink panics otherwise propagate.
 
 TYPES
 
@@ -682,10 +828,15 @@ type Observer struct {
     Observer records bounded decision counts and latency.
 
 func New(options Options) (*Observer, error)
-    New constructs instruments after panic-safe provider validation.
+    New rejects nil/typed-nil providers, then synchronously constructs two
+    instruments. Provider panics propagate and instrument errors are returned.
+    It retains instruments, not the provider, and owns no shutdown/export
+    worker.
 
 func (observer *Observer) Observe(observation ratelimit.Observation)
-    Observe records one bounded decision and its duration.
+    Observe records synchronously using context.Background; nil/zero observers
+    are no-ops. Direct observations are not label-validated or redacted beyond
+    classifying Err. Instrument panics propagate unless a service isolates them.
 
 type Options struct {
 	// MeterProvider is used during New to create instruments and is not retained.
@@ -696,6 +847,12 @@ type Options struct {
 package memory // import "github.com/faustbrian/go-rate-limit/v2/memory"
 
 Package memory provides bounded, sharded, process-local admission state.
+
+State quotas are per shard. Cardinality pressure may evict rate counters,
+reopening their capacity, but cannot evict live leases. Sweep is caller-driven;
+Close marks availability without draining calls or erasing maps. Strict methods
+interrupt lock waits and recheck cancellation before mutation; legacy methods
+retain pre-lock-only cancellation checks. Policy consistency is not negotiated.
 
 CONSTANTS
 
@@ -720,28 +877,45 @@ type Options struct {
 type Store struct {
 	// Has unexported fields.
 }
-    Store is a bounded, concurrency-safe, process-local backend.
+    Store is a sharded process-local backend safe for concurrent use after New.
+    Do not copy it after use. The zero value is not usable; no background
+    sweeper or shutdown join is owned. Cardinality is bounded, not total heap
+    bytes.
 
 func New(options Options) (*Store, error)
-    New validates options and constructs an empty Store.
+    New requires positive MaxKeys and Shards within their configured maxima,
+    with Shards no greater than MaxKeys. It allocates locks/maps and partitions
+    a fixed quota per shard; spare capacity in another shard cannot be borrowed.
 
 func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
-    Acquire atomically obtains a weighted process-local concurrency lease.
+    Acquire obtains a weighted process-local concurrency lease. Like Admit,
+    its legacy lock wait is not context-interruptible. An active same-ID/cost
+    retry returns the original expiry rather than renewing it.
 
 func (store *Store) AcquireStrict(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
-    AcquireStrict obtains one lease with explicit cancellation outcomes.
+    AcquireStrict validates and waits with the caller context, then rechecks it
+    under the lock. Expired leases are pruned using the effective request clock;
+    idempotent active retries preserve original ownership and expiry.
 
 func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
-    Admit atomically evaluates one non-concurrency request in process.
+    Admit evaluates one non-concurrency request under its shard lock. Context
+    is checked before an uninterruptible lock wait, not after acquiring it;
+    use AdmitStrict when cancellation during that wait must prevent mutation.
 
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
-    AdmitStrict evaluates one request with explicit cancellation outcomes.
+    AdmitStrict uses context-interruptible shard locking and rechecks
+    cancellation after acquisition before mutation. Clock rollback is clamped
+    per key. Strict fixed/sliding policies reject a same-ID period change rather
+    than reinterpret retained usage; capacity revisions preserve consumption.
 
 func (store *Store) Close() error
-    Close makes future operations return ratelimit.ErrUnavailable.
+    Close marks the store unavailable for subsequent admission, lease and sweep
+    preflight checks. It does not drain admitted operations or clear maps;
+    calls that passed preflight may finish after it returns.
 
 func (store *Store) Len() int
-    Len returns the current number of keys across all shards.
+    Len totals keys by locking one shard at a time, not as an atomic all-shard
+    snapshot. It remains available after Close.
 
 func (store *Store) Name() string
     Name returns the stable backend identifier.
@@ -753,13 +927,22 @@ func (store *Store) ReleaseStrict(ctx context.Context, lease ratelimit.Lease) er
     ReleaseStrict releases one lease with explicit cancellation outcomes.
 
 func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error)
-    Sweep removes idle keys and expired leases, returning the keys removed.
+    Sweep removes idle keys and expired leases at caller-supplied now, returning
+    keys removed. idleFor must be positive. Live leases prevent eviction;
+    callers own scheduling and clock choice, and Close makes subsequent sweeps
+    fail.
 
 package postgres // import "github.com/faustbrian/go-rate-limit/v2/postgres"
 
 Package postgres provides transactional admission backed by PostgreSQL and
 pgx. It is intended for coordination-heavy workloads, not as the default
 high-throughput backend.
+
+Pools and migration application are caller-owned. Startup checks establish table
+existence only. Strict operations declare commit/rollback ambiguity and use a
+detached rollback deadline starting when the transaction is acquired. Legacy
+methods retain released outcome and cleanup behavior. Deployment authority,
+replication durability and cleanup scheduling are outside the store.
 
 CONSTANTS
 
@@ -771,7 +954,9 @@ const (
 FUNCTIONS
 
 func GoMigration() (migrations.Migration, error)
-    GoMigration adapts SchemaMigration to migrations.
+    GoMigration adapts the hand-maintained SchemaMigration to migrations/v2
+    with default transaction mode. It does not apply SQL or open a connection;
+    the application owns migration installation and destructive Down use.
 
 
 TYPES
@@ -803,7 +988,8 @@ func SchemaMigration() Migration
 type Options struct {
 	// Timeout bounds each admission and lease operation; checks and cleanup use the caller context.
 	Timeout time.Duration
-	// LockTimeout bounds PostgreSQL lock acquisition; zero uses Timeout.
+	// LockTimeout bounds PostgreSQL lock acquisition; nonpositive uses Timeout.
+	// Strict setup rounds positive sub-millisecond values up to one millisecond.
 	LockTimeout time.Duration
 	// Clock selects client or PostgreSQL server time.
 	Clock ClockPolicy
@@ -813,10 +999,14 @@ type Options struct {
 type Store struct {
 	// Has unexported fields.
 }
-    Store is an atomic pgx-backed admission backend.
+    Store performs locked PostgreSQL transactions through a borrowed pool.
+    Construct it before use; no pool close, background cleanup or migration
+    application is owned. Strict methods require a strict constructor; released
+    methods retain legacy error normalization and unbounded detached rollback.
 
 func New(pool *pgxpool.Pool, options Options) (*Store, error)
     New constructs a Store without checking whether its migration is installed.
+    The pool is borrowed and never closed; concurrent calls rely on pool safety.
 
 func NewStrict(pool *pgxpool.Pool, options StrictOptions) (*Store, error)
     NewStrict constructs a strict Store without checking its schema.
@@ -825,7 +1015,9 @@ func Open(ctx context.Context, pool *pgxpool.Pool, options Options) (*Store, err
     Open constructs a Store and verifies the package-owned table exists.
 
 func OpenStrict(ctx context.Context, pool *pgxpool.Pool, options StrictOptions) (*Store, error)
-    OpenStrict constructs a strict Store and checks its schema.
+    OpenStrict constructs a strict Store and checks table existence with the
+    caller context. It leaves the borrowed pool open even on failure; this is
+    not verification of the complete schema or application of a migration.
 
 func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
     Acquire transactionally obtains a weighted distributed concurrency lease.
@@ -837,20 +1029,31 @@ func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratel
     Admit evaluates one non-concurrency request in a locked transaction.
 
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
-    AdmitStrict evaluates one request with explicit transaction outcomes.
+    AdmitStrict evaluates under a per-key advisory transaction lock and row
+    lock. Options.Timeout bounds operational calls. Begin/commit failure may be
+    unknown; every owned non-commit exit rolls back synchronously, and rollback
+    failure replaces a known failure with unknown. The borrowed pool remains
+    caller-owned.
 
 func (store *Store) Check(ctx context.Context) error
-    Check verifies that the package-owned schema migration is installed.
+    Check verifies that rate_limit_states resolves via to_regclass. It does
+    not verify column/index definitions or migration contents. It uses the
+    caller context directly, not Options.Timeout; migration application is
+    caller-owned.
 
 func (store *Store) CheckStrict(ctx context.Context) error
-    CheckStrict verifies the package-owned schema without mutation.
+    CheckStrict verifies table existence without mutation under the caller
+    context, not Options.Timeout. It does not authenticate schema definitions.
 
 func (store *Store) Cleanup(ctx context.Context, batch int) (int64, error)
-    Cleanup deletes at most batch expired states using SKIP LOCKED.
+    Cleanup deletes at most batch expired states using SKIP LOCKED. It uses the
+    caller context directly and owns no scheduling; removal permits fresh state
+    on later admission. batch must be in 1..MaxCleanupBatch.
 
 func (store *Store) CleanupStrict(ctx context.Context, batch int) (int64, error)
-    CleanupStrict deletes a bounded expired-state batch with explicit outcome
-    semantics.
+    CleanupStrict deletes at most MaxCleanupBatch expired rows under the
+    caller context, without Options.Timeout or detached rollback. Failure after
+    statement dispatch is unknown because rows may already have been removed.
 
 func (store *Store) Name() string
     Name returns the stable backend identifier.
@@ -863,7 +1066,9 @@ func (store *Store) ReleaseStrict(ctx context.Context, lease ratelimit.Lease) er
 
 type StrictOptions struct {
 	Options
-	// RollbackTimeout bounds synchronous cleanup after transaction ownership.
+	// RollbackTimeout is a positive budget starting at transaction ownership,
+	// not a fresh duration when rollback starts. Cleanup detaches cancellation
+	// while retaining context values; callers must provision enough total time.
 	RollbackTimeout time.Duration
 }
     StrictOptions configures strict PostgreSQL operations and owned rollback
@@ -873,6 +1078,10 @@ package ratelimithttp // import "github.com/faustbrian/go-rate-limit/v2/ratelimi
 
 Package ratelimithttp provides net/http inbound admission middleware and strict
 trusted-proxy client IP extraction.
+
+This compatibility path uses Service rather than StrictService and preserves its
+unchecked downstream-handler and receiver behavior. The canonical adapter adds
+validated middleware construction; neither path owns application retries.
 
 Deprecated: use github.com/faustbrian/go-rate-limit/v2/adapters/http. This
 package remains supported through the documented compatibility interval.
@@ -902,7 +1111,11 @@ func NewClientIPExtractor(options ClientIPOptions) (*ClientIPExtractor, error)
     NewClientIPExtractor validates and copies trusted proxy prefixes.
 
 func (extractor *ClientIPExtractor) ClientIP(request *http.Request) (netip.Addr, error)
-    ClientIP returns the rightmost untrusted address, or the direct peer.
+    ClientIP returns the direct peer when untrusted; trusted peers may provide
+    at most 4096 bytes and 32 forwarded addresses. All addresses are parsed
+    before selecting the rightmost untrusted, or leftmost when all are trusted.
+    Header.Get uses the first header line. Nil receiver/request behavior remains
+    unchecked; trusted proxies must strip spoofed forwarding metadata.
 
 type ClientIPOptions struct {
 	// TrustedProxies contains explicit masked network prefixes.
@@ -936,6 +1149,10 @@ package ratelimitlog // import "github.com/faustbrian/go-rate-limit/v2/ratelimit
 
 Package ratelimitlog adapts bounded observations to structured slog records.
 
+Calls use a borrowed logger and context.Background, with no asynchronous queue
+or shutdown ownership. Direct labels are unvalidated, and nil/zero observers
+retain legacy panic behavior; the canonical adapter makes those calls no-ops.
+
 Deprecated: use github.com/faustbrian/go-rate-limit/v2/adapters/slog. This
 package remains supported through the documented compatibility interval.
 
@@ -965,16 +1182,26 @@ package ratelimitprincipal // import "github.com/faustbrian/go-rate-limit/v2/rat
 Package ratelimitprincipal adapts authentication principals to hashed admission
 keys without depending on a concrete authentication package.
 
+Key retains its two Subject calls and nil-interface-only validation. KeyStrict
+checks typed nil and snapshots once; neither helper authenticates a principal or
+recovers its panic. SHA-256 derivation is not encryption or anonymity.
+
 Deprecated: use github.com/faustbrian/go-rate-limit/v2/adapters/authentication.
 This package remains supported through the documented compatibility interval.
 
 FUNCTIONS
 
 func Key(principal Principal) (ratelimit.Key, error)
-    Key derives a bounded, irreversibly hashed key from principal.
+    Key derives a bounded SHA-256 key, checking only a nil interface. It calls
+    Subject once for validation and again for derivation; values can differ.
+    Typed-nil principals and callback panics retain their compatibility
+    behavior. KeyStrict snapshots once; neither helper authenticates the
+    identity.
 
 func KeyStrict(principal Principal) (ratelimit.Key, error)
-    KeyStrict derives a key after panic-safe principal validation.
+    KeyStrict rejects nil/typed-nil principals and snapshots Subject once.
+    Subject panics propagate; identity authenticity remains the caller's
+    concern.
 
 
 TYPES
@@ -989,6 +1216,11 @@ package ratelimitqueue // import "github.com/faustbrian/go-rate-limit/v2/ratelim
 
 Package ratelimitqueue provides queue admission middleware that returns a typed
 deferral without acknowledging, sleeping, or changing retry ownership.
+
+This compatibility path uses Service, borrows handlers/callbacks and preserves
+legacy nil-function behavior. Message fields are not generally size-validated;
+only the selected key is bounded. The canonical adapter adds strict admission
+and checked handler construction, not durable queue ownership.
 
 Deprecated: use github.com/faustbrian/go-rate-limit/v2/adapters/queue. This
 package remains supported through the documented compatibility interval.
@@ -1032,7 +1264,8 @@ type Message struct {
 	// Attempt reports the durable system's current delivery attempt.
 	Attempt uint64
 }
-    Message contains bounded queue admission inputs, not a durable payload.
+    Message contains caller-owned queue metadata, not a durable payload.
+    Strings are not generally validated; NewKey bounds the derived subject.
 
 type Middleware func(Handler) Handler
     Middleware wraps a Handler with admission that preserves durable semantics.
@@ -1068,6 +1301,11 @@ package ratelimitrpc // import "github.com/faustbrian/go-rate-limit/v2/ratelimit
 Package ratelimitrpc provides transport-neutral JSON-RPC admission middleware
 for global, principal, method, tenant, and custom subjects.
 
+Rules consume capacity independently in order; a later rejection does not roll
+back earlier rules. Call/response payloads are not encoded or deep-copied,
+and identities are not authenticated here. Borrowed callbacks and handlers run
+synchronously, may be concurrent, and retain legacy panic behavior.
+
 CONSTANTS
 
 const (
@@ -1082,7 +1320,7 @@ const (
 TYPES
 
 type Call struct {
-	// ID is copied to the response without interpretation.
+	// ID is copied by interface assignment, not deep-copied or validated.
 	ID any
 	// Method is the requested JSON-RPC method.
 	Method string
@@ -1091,7 +1329,9 @@ type Call struct {
 	// Tenant is an optional tenant identity.
 	Tenant string
 }
-    Call contains bounded JSON-RPC admission inputs.
+    Call contains caller-owned JSON-RPC admission inputs. No general payload
+    size validation is performed; selected subjects are bounded during key
+    derivation. Method, Principal and Tenant are not authenticated here.
 
 type Error struct {
 	// Code is CodeRateLimited or CodeRateUnavailable.
@@ -1119,7 +1359,11 @@ type Middleware func(Handler) Handler
     Middleware wraps a JSON-RPC Handler with ordered admission rules.
 
 func New(options Options) (Middleware, error)
-    New validates and copies options before constructing middleware.
+    New copies the bounded ordered rule slice, borrowing callbacks and Service.
+    Earlier successful rules consume capacity even when a later rule fails;
+    there is no cross-rule transaction or rollback. The downstream
+    handler/callbacks must support concurrent calls and non-nil contexts;
+    their panics propagate.
 
 type Options struct {
 	// Service makes admission decisions.
@@ -1169,7 +1413,12 @@ func Tenant() SubjectFunc
 package ratelimittelemetry // import "github.com/faustbrian/go-rate-limit/v2/ratelimittelemetry"
 
 Package ratelimittelemetry adapts bounded observations to OpenTelemetry metrics
-without using attacker-controlled values as unbounded labels.
+using caller-controlled policy and subject-kind labels.
+
+The legacy instrumentation scope and attributes remain distinct from the
+canonical adapter. NewStrict checks typed nil, but provider panics propagate.
+Nil/zero observers retain legacy panic behavior, and directly supplied labels
+are not validated. Export and provider shutdown remain caller-owned.
 
 Deprecated: use github.com/faustbrian/go-rate-limit/v2/adapters/otel. This
 package remains supported through the documented compatibility interval.
@@ -1185,11 +1434,15 @@ func New(options Options) (*Observer, error)
     New constructs metric instruments using MeterProvider.
 
 func NewStrict(options Options) (*Observer, error)
-    NewStrict constructs metric instruments after panic-safe provider
-    validation.
+    NewStrict rejects nil/typed-nil providers before constructing instruments.
+    Provider method panics still propagate; the returned instruments are
+    borrowed and no provider shutdown is owned.
 
 func (observer *Observer) Observe(observation ratelimit.Observation)
-    Observe records one bounded decision and its duration.
+    Observe records synchronously with context.Background under this legacy
+    scope, without the canonical adapter's error-kind attribute. Nil/zero
+    observers retain their panic behavior; direct labels are not validated or
+    redacted.
 
 type Options struct {
 	// MeterProvider owns the created counter and latency histogram.
@@ -1202,20 +1455,36 @@ package ratelimittest // import "github.com/faustbrian/go-rate-limit/v2/ratelimi
 Package ratelimittest provides deterministic clocks, rational reference models,
 fixtures, and reusable cross-backend conformance tests.
 
+These helpers characterize selected in-process scenarios, not official protocol
+conformance, restart durability or performance. Factories supply fresh state
+and register their own cleanup. Calls use background contexts, so backend
+budgets and the enclosing test timeout must bound completion. Reference maps are
+unbounded test state; sliding-window logic shares the 16-segment design.
+
 FUNCTIONS
 
 func RunBackendAtomicity(t *testing.T, factory BackendFactory)
-    RunBackendAtomicity proves exact same-key capacity and idempotent lease
-    retry behavior under concurrent contention.
+    RunBackendAtomicity checks many-key, same-key and idempotent lease
+    scenarios with 64 concurrent workers. It joins all workers with no
+    independent timeout; the factory/backend and enclosing test budget must
+    bound completion. Selected assertions are not general linearizability or
+    distributed durability proof.
 
 func RunBackendConformance(t *testing.T, factory BackendFactory)
-    RunBackendConformance compares a backend with the rational reference model.
+    RunBackendConformance compares selected deterministic legacy admission and
+    revision/lease scenarios with the reference model. Optional lease cases
+    skip when the fixture declares no support; that is not proof of lease
+    correctness. It does not cover every strict outcome, persistence restart or
+    clock range.
 
 
 TYPES
 
 type BackendFactory func(testing.TB) BackendFixture
-    BackendFactory constructs isolated state for one conformance subtest.
+    BackendFactory constructs fresh isolated state per subtest and registers
+    cleanup with testing.TB. It must supply a usable Backend and bound
+    operations; the helpers do not create a per-call timeout or own backend
+    resources.
 
 type BackendFixture struct {
 	// Backend is required for algorithm conformance.
@@ -1228,7 +1497,9 @@ type BackendFixture struct {
 type Clock struct {
 	// Has unexported fields.
 }
-    Clock is a concurrency-safe deterministic test clock.
+    Clock is a concurrency-safe deterministic test clock; do not copy after use.
+    Zero time and backward/negative moves are allowed here, although admission
+    validation still rejects invalid request instants.
 
 func NewClock(now time.Time) *Clock
     NewClock constructs a Clock at now.
@@ -1245,7 +1516,11 @@ func (clock *Clock) Set(now time.Time)
 type Reference struct {
 	// Has unexported fields.
 }
-    Reference is a mutex-protected rational-arithmetic algorithm model.
+    Reference is a mutex-protected rational-arithmetic algorithm model. Use
+    NewReference and do not copy it after use. Its key map has no cardinality
+    bound or automatic sweeping; it is a test oracle, not a production store.
+    Sliding windows share the production 16-segment approximation, so this is
+    not an independent proof of an exact rolling-log algorithm.
 
 func NewReference() *Reference
     NewReference constructs an empty reference model.
@@ -1275,6 +1550,12 @@ package valkey // import "github.com/faustbrian/go-rate-limit/v2/valkey"
 
 Package valkey provides atomic distributed admission backed by native Valkey.
 Keys use one opaque hash tag, scripts are versioned, and state has bounded TTL.
+
+The client is borrowed. Startup checks observe Valkey 9+ and noeviction once;
+operators own ongoing configuration and replication durability. Lua executes
+on one authoritative key/slot; script atomic execution is not rollback after
+a runtime error. Strict transport/reply ambiguity never proves safe retry.
+Released methods retain legacy revision and error-normalization behavior.
 
 CONSTANTS
 
@@ -1306,19 +1587,26 @@ type Options struct {
 type Store struct {
 	// Has unexported fields.
 }
-    Store is an atomic native-Valkey admission backend.
+    Store executes per-key Lua operations against a borrowed native Valkey
+    client. Use a constructor; do not copy internal configuration after use.
+    Atomicity is on the selected server, not a durability or replica guarantee.
+    The store never closes the client or owns application retry orchestration.
 
 func New(client valkeygo.Client, options Options) (*Store, error)
     New constructs a Store without performing network startup checks.
 
 func NewStrict(client valkeygo.Client, options Options) (*Store, error)
-    NewStrict constructs a Store after panic-safe client validation.
+    NewStrict rejects nil and typed-nil clients without performing a command.
+    It borrows the client; subsequent client method panics are not recovered.
 
 func Open(ctx context.Context, client valkeygo.Client, options Options) (*Store, error)
     Open constructs a Store and verifies Valkey version and eviction policy.
 
 func OpenStrict(ctx context.Context, client valkeygo.Client, options Options) (*Store, error)
-    OpenStrict constructs a Store and performs a strict startup check.
+    OpenStrict performs a caller-context-bounded version/noeviction startup
+    check. The client stays open on failure; successful checks are an
+    observation at startup, not continuous verification of failover or
+    configuration.
 
 func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error)
     Acquire atomically obtains a weighted distributed concurrency lease.
@@ -1330,10 +1618,15 @@ func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratel
     Admit evaluates one non-concurrency request in an atomic Lua script.
 
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
-    AdmitStrict evaluates one request with explicit Lua dispatch outcomes.
+    AdmitStrict executes one bounded Lua command after local/context validation.
+    Transport errors after dispatch and malformed replies are unknown, since a
+    mutation may have occurred. A known script reply uses the server-selected
+    effective time; it need not be later than the caller clock.
 
 func (store *Store) Check(ctx context.Context) error
-    Check requires Valkey 9 or newer and a noeviction memory policy.
+    Check requires Valkey 9 or newer and observes noeviction with the caller
+    context, not Options.Timeout. It does not keep watching configuration or
+    establish failover durability. Client lifetime remains caller-owned.
 
 func (store *Store) CheckStrict(ctx context.Context) error
     CheckStrict verifies Valkey version and eviction policy without mutation.

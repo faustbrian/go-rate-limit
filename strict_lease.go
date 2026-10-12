@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-// Acquire validates and obtains one strict concurrency lease.
+// Acquire validates and obtains one strict concurrency lease. A complete known
+// result wins racing cancellation; incomplete lease/result pairs are unknown and
+// fail closed. Concurrency never fails open and backends own expiry semantics.
 func (service *StrictService) Acquire(ctx context.Context, request LeaseRequest) (Lease, Decision, error) {
 	if service == nil || service.backend == nil || service.name == "" {
 		return Lease{}, Decision{}, fmt.Errorf("%w: strict service is nil or uninitialized", ErrInvalidPolicy)
@@ -69,6 +71,9 @@ func completeLease(lease Lease, decision Decision, request LeaseRequest) bool {
 }
 
 // Release relinquishes one strict lease without observing or retaining it.
+// Nonempty Backend must match the cached name; empty Backend is accepted for
+// compatibility. Known success wins racing cancellation. Ownership fields are
+// checked, but the public Lease value is not cryptographic authorization.
 func (service *StrictService) Release(ctx context.Context, lease Lease) error {
 	if service == nil || service.backend == nil || service.name == "" {
 		return fmt.Errorf("%w: strict service is nil or uninitialized", ErrInvalidPolicy)

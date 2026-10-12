@@ -61,7 +61,11 @@ func New(options Options) (*Middleware, error) {
 	return &Middleware{options: options}, nil
 }
 
-// Wrap validates and wraps one downstream handler.
+// Wrap rejects nil/typed-nil handlers. Each call derives Key, Cost and Now in
+// order, then admits before invoking next once. Callbacks are borrowed, may run
+// concurrently and may block/panic; the middleware adds no deadline. Derivation
+// errors produce 400, rejection 429, and other admission failures 503. Reset and
+// retry headers round nonnegative relative seconds upward, not Unix timestamps.
 func (middleware *Middleware) Wrap(next http.Handler) (http.Handler, error) {
 	if middleware == nil || middleware.options.Service == nil {
 		return nil, fmt.Errorf("%w: middleware is nil or uninitialized", ratelimit.ErrInvalidPolicy)

@@ -13,11 +13,14 @@ type Request struct {
 	Key Key
 	// Cost is the positive number of units requested.
 	Cost uint64
-	// Now is the caller-supplied current time used by client-clock backends.
+	// Now is required even with server-clock backends. Client-clock backends
+	// use its microsecond-normalized instant and clamp backward movement per key.
 	Now time.Time
 }
 
-// Validate checks that all request inputs are present and bounded by Policy.
+// Validate checks policy/key presence, positive Cost within MaxCost and a
+// nonzero Now inside the exact Unix-microsecond range with room for the policy
+// duration. It does not validate backend capability or clock synchronization.
 func (r Request) Validate() error {
 	if r.Policy.id == "" {
 		return fmt.Errorf("%w: policy, key, time, and bounded cost are required", ErrInvalidRequest)

@@ -68,9 +68,11 @@ LeaseRequest, LeaseBackend, Service.Acquire, and Service.Release are reserved
 for concurrency policies. Lease IDs are bounded and acquisition is
 idempotent. Release verifies ID, cost, expiry, policy, key, and backend.
 
-Key is namespaced, versioned, typed, and length bounded. Hash=true persists an
-irreversible SHA-256 derivation instead of the subject. Raw credentials and
-tenant-sensitive values should always be hashed.
+Key is namespaced, versioned, typed, and length bounded. Hash=true persists a
+deterministic SHA-256 derivation over namespace, version, kind and value instead
+of the raw subject. This is not encryption or anonymity: low-entropy identities
+can be guessed. Keep credentials out of subjects and use a deployment-specific
+HMAC in a custom key derivation when guessing is a concern.
 
 The authoritative exported declarations are available through:
 

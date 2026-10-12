@@ -11,15 +11,17 @@ import (
 	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
-// Message contains bounded queue admission inputs, not a durable payload.
+// Message contains caller-owned queue admission metadata, not a durable
+// payload. Its strings are not collectively validated or bounded; the selected
+// derived subject is bounded by NewKey. ID and Attempt do not provide deduplication.
 type Message struct {
 	// ID is the durable message identifier.
 	ID string
-	// Queue is the bounded queue name.
+	// Queue is the caller-provided queue name.
 	Queue string
-	// Tenant is the bounded tenant identifier.
+	// Tenant is the caller-verified tenant identifier.
 	Tenant string
-	// Principal is the bounded authenticated subject.
+	// Principal is an identity whose authenticity the caller establishes.
 	Principal string
 	// Attempt is caller-owned delivery-attempt metadata.
 	Attempt uint64
@@ -27,6 +29,8 @@ type Message struct {
 
 // Handler processes an admitted queue message without owning acknowledgement.
 type Handler interface {
+	// Handle runs admitted application work. The queue integration owns
+	// acknowledgement, retry scheduling, cancellation and payload lifetime.
 	Handle(context.Context, Message) error
 }
 
@@ -102,7 +106,10 @@ func New(options Options) (*Middleware, error) {
 	return &Middleware{options: options}, nil
 }
 
-// Wrap validates and wraps one downstream handler.
+// Wrap rejects nil/typed-nil handlers, then synchronously derives Subject,
+// Cost and Now in order before admission. No callback is retried or retained
+// per call. Deferral does not sleep or acknowledge; callbacks/handlers may run
+// concurrently and their panics propagate.
 func (middleware *Middleware) Wrap(next Handler) (Handler, error) {
 	if middleware == nil || middleware.options.Service == nil {
 		return nil, fmt.Errorf("%w: middleware is nil or uninitialized", ratelimit.ErrInvalidPolicy)
@@ -138,7 +145,9 @@ func (middleware *Middleware) Wrap(next Handler) (Handler, error) {
 	}), nil
 }
 
-// ByQueueAndTenant derives an unambiguous composite subject.
+// ByQueueAndTenant length-prefixes Queue in bytes, making the composite
+// unambiguous even with colons. Empty parts fail; NewKey later enforces size.
+// This does not authenticate tenant membership.
 func ByQueueAndTenant() SubjectFunc {
 	return func(message Message) (ratelimit.Subject, error) {
 		if message.Queue == "" || message.Tenant == "" {

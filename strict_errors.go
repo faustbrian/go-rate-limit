@@ -38,12 +38,16 @@ type strictOutcomeError struct {
 }
 
 // CanceledOutcome constructs a bounded declaration that dispatch did not occur.
+// It matches ErrCanceled, context.Canceled and, for compatibility, ErrDeadline.
+// A backend is responsible for the truth of this declaration.
 func CanceledOutcome() error { return &strictOutcomeError{kind: strictOutcomeCanceled} }
 
 // DeadlineOutcome constructs a bounded deadline declaration that dispatch did not occur.
 func DeadlineOutcome() error { return &strictOutcomeError{kind: strictOutcomeDeadline} }
 
 // UnknownOutcome constructs a bounded declaration that dispatch may have occurred.
+// Only direct context.Canceled or context.DeadlineExceeded adds a classification;
+// the supplied error, its text, cause and tree are not retained or traversed.
 func UnknownOutcome(contextCategory error) error {
 	contextKind := strictOutcomeKind(0)
 	if directError(contextCategory, context.Canceled) {
@@ -97,6 +101,8 @@ func (err *strictOutcomeError) Is(target error) bool {
 type BackendError struct{ category error }
 
 // NewBackendError validates and retains one direct safe backend category.
+// Wrapped categories and arbitrary errors are rejected without retaining their
+// text. A category accepted here may still be inapplicable to a service method.
 func NewBackendError(category error) (*BackendError, error) {
 	if !safeBackendCategory(category) {
 		return nil, fmt.Errorf("%w: backend error category is not safe", ErrInvalidPolicy)

@@ -40,7 +40,10 @@ type executor interface {
 	exec(context.Context, []string, []string) ([]string, error)
 }
 
-// Store is an atomic native-Valkey admission backend.
+// Store executes per-key Lua operations against a borrowed native Valkey
+// client. Use a constructor; do not copy internal configuration after use.
+// Atomicity is on the selected server, not a durability or replica guarantee.
+// The store never closes the client or owns application retry orchestration.
 type Store struct {
 	executor executor
 	options  Options

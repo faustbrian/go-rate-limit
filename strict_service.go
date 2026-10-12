@@ -18,24 +18,36 @@ const (
 // StrictBackend exposes explicit dispatch-outcome declarations.
 type StrictBackend interface {
 	Backend
+	// AdmitStrict returns a complete allowed/rejected result or a direct
+	// outcome declaration/safe category applicable to admission. Wrapping such
+	// errors does not establish a trusted declaration for StrictService.
 	AdmitStrict(context.Context, Request) (Decision, error)
 }
 
 // StrictLeaseBackend exposes strict admission and lease lifecycle operations.
 type StrictLeaseBackend interface {
 	StrictBackend
+	// AcquireStrict returns a complete owned lease and decision on success,
+	// or an explicit failure declaration with zero lease.
 	AcquireStrict(context.Context, LeaseRequest) (Lease, Decision, error)
+	// ReleaseStrict releases matching ownership or returns a method-applicable
+	// direct category/outcome declaration; ambiguity must not imply release.
 	ReleaseStrict(context.Context, Lease) error
 }
 
 // StrictService validates complete backend results and fails closed on ambiguity.
+// Construct it with NewStrictService; nil/zero receivers and nil contexts are
+// rejected. Collaborators are borrowed, may be called concurrently, and are not
+// closed. Backend panics propagate; observer panics alone are isolated.
 type StrictService struct {
 	backend   StrictBackend
 	observers []Observer
 	name      string
 }
 
-// NewStrictService constructs a strict service without invoking backend operations.
+// NewStrictService rejects nil/typed-nil backends and typed-nil observers,
+// filters nil observers, and caches one validated backend.Name call. That call
+// may panic; no admission operation is invoked and no client lifetime is owned.
 func NewStrictService(backend StrictBackend, observers ...Observer) (*StrictService, error) {
 	if isNilInterface(backend) {
 		return nil, fmt.Errorf("%w: backend is required", ErrInvalidPolicy)
@@ -81,7 +93,10 @@ func validBackendName(name string) bool {
 	return !previousHyphen
 }
 
-// Admit validates and executes one strict admission request.
+// Admit validates and executes one strict admission request. A complete known
+// result wins a racing cancellation. Unknown or malformed results fail closed;
+// only known pre-dispatch deadlines or safe availability failures can fail open
+// for a non-concurrency policy. No unsafe error tree is traversed or formatted.
 func (service *StrictService) Admit(ctx context.Context, request Request) (Decision, error) {
 	decision, err, _ := service.admit(ctx, request, false)
 	return decision, err
@@ -212,6 +227,8 @@ const (
 	declarationOutcome
 )
 
+// strictDeclaration uses direct identity and the owned declaration type, not
+// errors.Is: arbitrary Is/Unwrap methods cannot establish dispatch certainty.
 func strictDeclaration(err error) (declarationKind, error) {
 	if err == nil {
 		return declarationUnsafe, nil
@@ -282,13 +299,17 @@ func strictDeadlineFailOpen(request Request, err error) bool {
 type StrictBatchDecision struct {
 	// Decisions has exactly one position per input request.
 	Decisions []Decision
-	// Attempted contains the ordered indexes dispatched to the backend.
+	// Attempted contains the ordered indexes dispatched to the backend. The
+	// returned slice is caller-owned; zero decisions may be unattempted.
 	Attempted []int
 	// Atomicity records the validated batch atomicity mode.
 	Atomicity Atomicity
 }
 
-// Batch evaluates a validated per-item batch with structured failures.
+// Batch validates every item before dispatch, then evaluates in order without
+// rollback. Cancellation/deadline before dispatch stops the suffix; an ambiguous
+// attempted item plus caller cancellation also stops it. Completed effects remain.
+// Decisions and Attempted are caller-owned; errors contain ordered item failures.
 func (service *StrictService) Batch(ctx context.Context, batch BatchRequest) (StrictBatchDecision, error) {
 	if service == nil || service.backend == nil || service.name == "" {
 		return StrictBatchDecision{}, fmt.Errorf("%w: strict service is nil or uninitialized", ErrInvalidPolicy)

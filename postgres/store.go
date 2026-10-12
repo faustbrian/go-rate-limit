@@ -24,7 +24,8 @@ const (
 type Options struct {
 	// Timeout bounds each admission and lease operation; checks and cleanup use the caller context.
 	Timeout time.Duration
-	// LockTimeout bounds PostgreSQL lock acquisition; zero uses Timeout.
+	// LockTimeout bounds PostgreSQL lock acquisition; nonpositive uses Timeout.
+	// Strict setup rounds positive sub-millisecond values up to one millisecond.
 	LockTimeout time.Duration
 	// Clock selects client or PostgreSQL server time.
 	Clock ClockPolicy
@@ -34,7 +35,10 @@ type executor interface {
 	admit(context.Context, []byte, ratelimit.Request) (ratelimit.Decision, error)
 }
 
-// Store is an atomic pgx-backed admission backend.
+// Store performs locked PostgreSQL transactions through a borrowed pool.
+// Construct it before use; no pool close, background cleanup or migration
+// application is owned. Strict methods require a strict constructor; released
+// methods retain legacy error normalization and unbounded detached rollback.
 type Store struct {
 	executor        executor
 	options         Options

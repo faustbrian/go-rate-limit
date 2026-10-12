@@ -7,6 +7,10 @@ versioning after v1.0.0.
 
 ### Changed
 
+- Clarify source contracts for strict versus compatibility outcomes, borrowed
+  collaborators, cancellation/cleanup budgets, lease expiry, memory eviction,
+  proxy trust and deterministic key hashing without changing admission behavior.
+
 - Align OpenTelemetry modules at v1.46.0, retaining metric aggregation
   fixes and the SDK endpoint-configuration disclosure fix
   (GHSA-8wmf-6v46-5gfg). Characterize lazy attribute filtering with

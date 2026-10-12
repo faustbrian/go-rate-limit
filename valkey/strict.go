@@ -15,7 +15,8 @@ import (
 	valkeygo "github.com/valkey-io/valkey-go"
 )
 
-// NewStrict constructs a Store after panic-safe client validation.
+// NewStrict rejects nil and typed-nil clients without performing a command.
+// It borrows the client; subsequent client method panics are not recovered.
 func NewStrict(client valkeygo.Client, options Options) (*Store, error) {
 	if strictNil(client) {
 		return nil, fmt.Errorf("%w: Valkey client is required", ratelimit.ErrInvalidPolicy)
@@ -23,7 +24,9 @@ func NewStrict(client valkeygo.Client, options Options) (*Store, error) {
 	return New(client, options)
 }
 
-// OpenStrict constructs a Store and performs a strict startup check.
+// OpenStrict performs a caller-context-bounded version/noeviction startup
+// check. The client stays open on failure; successful checks are an observation
+// at startup, not continuous verification of failover or configuration.
 func OpenStrict(ctx context.Context, client valkeygo.Client, options Options) (*Store, error) {
 	return openStrictChecked(ctx, func() (*Store, error) { return NewStrict(client, options) })
 }
@@ -42,7 +45,10 @@ func openStrictChecked(ctx context.Context, construct func() (*Store, error)) (*
 	return store, nil
 }
 
-// AdmitStrict evaluates one request with explicit Lua dispatch outcomes.
+// AdmitStrict executes one bounded Lua command after local/context validation.
+// Transport errors after dispatch and malformed replies are unknown, since a
+// mutation may have occurred. A known script reply uses the server-selected
+// effective time; it need not be later than the caller clock.
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error) {
 	if err := store.strictReady(ctx); err != nil {
 		return ratelimit.Decision{}, err
@@ -323,6 +329,8 @@ func strictNil(value any) bool {
 	}
 }
 
+// valkeyStateTTL saturates doubled retention instead of overflowing to an
+// unexpectedly short TTL; retention still does not fence external side effects.
 func valkeyStateTTL(duration time.Duration) time.Duration {
 	if duration > time.Duration(math.MaxInt64)/2 {
 		return time.Duration(math.MaxInt64)

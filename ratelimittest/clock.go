@@ -5,7 +5,9 @@ import (
 	"time"
 )
 
-// Clock is a concurrency-safe deterministic test clock.
+// Clock is a concurrency-safe deterministic test clock; do not copy after use.
+// Zero time and backward/negative moves are allowed here, although admission
+// validation still rejects invalid request instants.
 type Clock struct {
 	mu  sync.RWMutex
 	now time.Time

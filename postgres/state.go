@@ -20,6 +20,9 @@ const (
 	maxExactMicros   = int64(9_007_199_254_740_991)
 )
 
+// persistedState is the version-1 wire envelope. Strict window period and
+// carried-usage provenance occupy algorithm-unused legacy fields when encoded,
+// allowing old readers to round-trip rows without changing that wire shape.
 type persistedState struct {
 	Schema         int                             `json:"schema"`
 	PolicyID       string                          `json:"policy_id"`
@@ -557,6 +560,8 @@ func decodeStateLegacy(encoded []byte) (*persistedState, error) {
 	return decodeStateMode(encoded, false)
 }
 
+// decodeStateMode keeps released decoding separate from strict integrity rules;
+// stricter shape validation must not silently redefine compatibility callers.
 func decodeStateMode(encoded []byte, strict bool) (*persistedState, error) {
 	if strict {
 		var shape struct {

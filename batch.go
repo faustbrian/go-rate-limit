@@ -21,7 +21,8 @@ const (
 
 // BatchRequest groups bounded admission attempts with explicit atomicity.
 type BatchRequest struct {
-	// Requests contains between one and MaxBatchSize attempts.
+	// Requests contains between one and MaxBatchSize attempts. The slice is
+	// borrowed during Batch; do not mutate it concurrently.
 	Requests []Request
 	// Atomicity must be AtomicityPerItem.
 	Atomicity Atomicity
@@ -35,7 +36,10 @@ type BatchDecision struct {
 	Atomicity Atomicity
 }
 
-// Batch evaluates a bounded list with per-item atomicity and no hidden retries.
+// Batch validates all inputs before any dispatch, then processes every item
+// independently in order with no rollback or hidden retries. It does not stop
+// the loop on cancellation; each Admit/backend applies its own context behavior.
+// The returned decisions are caller-owned and item errors are joined.
 func (service *Service) Batch(ctx context.Context, batch BatchRequest) (BatchDecision, error) {
 	if len(batch.Requests) == 0 {
 		return BatchDecision{}, fmt.Errorf("%w: batch size must be between 1 and %d", ErrInvalidRequest, MaxBatchSize)

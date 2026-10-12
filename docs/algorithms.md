@@ -9,9 +9,13 @@ canonicalized to microseconds before state transitions. Valkey Lua integers
 remain exactly representable: policy construction rejects limits above
 2^53-1 or a non-concurrency Limit multiplied by Period microseconds above that
 boundary, and requests reject timestamps or reset times outside the same exact
-range. Sub-microsecond drift cannot make backend decisions diverge. Floating
-point is never accepted outside the exact integer range in production
-admission arithmetic.
+range. Admission inputs discard sub-microsecond drift. This is not proof of
+equivalent behavior at every accepted instant: memory/reference window
+calculations use
+Unix nanoseconds, whereas distributed state uses Unix microseconds. The
+conformance helper exercises selected deterministic times, not the full date
+range or every segment-boundary representation. Floating point is never
+accepted outside the exact integer range in production admission arithmetic.
 
 Reset is the time until the bucket is full. RetryAfter is the time until the
 requested cost is available. Clock rollback is clamped to the latest observed
@@ -25,8 +29,10 @@ before the Unix epoch. A rollback cannot reopen an older window.
 ## Sliding window counter
 
 The bounded sliding counter uses exactly 16 segments per Period. State cost is
-constant per key regardless of capacity or request count. The approximation
-may retain a segment until its segment boundary; Reset and RetryAfter expose
+bounded to 16 segment records per key regardless of capacity or request count
+for this algorithm; this is not a bound on an entire backend or test oracle.
+The approximation may retain a segment until its segment boundary; Reset and
+RetryAfter expose
 that boundary. It is not an unbounded request log.
 
 ## Concurrency

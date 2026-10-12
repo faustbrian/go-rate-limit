@@ -10,7 +10,8 @@ import (
 	ratelimit "github.com/faustbrian/go-rate-limit/v2"
 )
 
-// Message contains bounded queue admission inputs, not a durable payload.
+// Message contains caller-owned queue metadata, not a durable payload.
+// Strings are not generally validated; NewKey bounds the derived subject.
 type Message struct {
 	// ID identifies the durable message.
 	ID string

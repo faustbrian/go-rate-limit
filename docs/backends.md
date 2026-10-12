@@ -5,8 +5,13 @@
 Memory is process-local. MaxKeys and Shards are mandatory. Each shard has a
 deterministic quota and evicts the least recently observed key, breaking ties
 lexicographically. Sweep removes idle state, prunes expired leases, and
-preserves live leases. Close prevents new work. The race suite and hot-key
-benchmarks exercise contention.
+preserves live leases. Quotas cannot borrow unused capacity from other shards.
+Eviction can discard an unexpired rate counter, so recreation starts with fresh
+capacity. Close marks subsequent preflight checks unavailable but does not join
+in-flight calls or erase state. Strict methods interrupt lock waits and recheck
+cancellation before mutation; legacy methods check only before waiting.
+Policy.Consistency does not enforce that this process-local backend is suitable
+for a policy. The race suite and hot-key benchmarks exercise selected contention.
 
 ## Valkey
 
@@ -20,7 +25,10 @@ noeviction.
 Strict mutations use separate Lua script identities for strict revision and
 corruption validation. Fixed/sliding strict state records the established
 period, preserves full same-period consumption through capacity revisions, and
-rejects future, duplicate, or wrong-slot active segments before mutation.
+rejects future, duplicate, or wrong-slot active segments before consumption.
+Scripts execute atomically on one server, but Lua runtime errors do not undo
+already executed commands. Strict transport or malformed-reply failures remain
+unknown; startup noeviction checks are not continuous configuration monitoring.
 Released `Admit` and lease methods retain their v1 state
 transition behavior, including legacy policy-revision carry semantics.
 
@@ -55,10 +63,12 @@ evidence.
 
 NewStrict and OpenStrict require a positive RollbackTimeout in StrictOptions.
 Once a strict operation owns a transaction, every non-commit exit performs one
-synchronous rollback under that bounded detached cleanup context. A commit or
+synchronous rollback under a detached deadline starting at transaction
+ownership, not a fresh budget at cleanup entry. A commit or
 rollback failure is outcome unknown; the supplied pool remains caller-owned.
 NewStrict performs no pool operation. OpenStrict performs one caller-bounded
-schema check, releases temporary query resources before return, and leaves the
+table-existence check, not column/index or migration-content verification,
+releases temporary query resources before return, and leaves the
 borrowed pool open on failure. Only owned transaction rollback detaches caller
 cancellation; checks and non-transactional cleanup remain caller-bounded.
 Strict state reads reject JSON documents larger than 128 KiB in SQL before the

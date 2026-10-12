@@ -86,6 +86,7 @@ func (tx poolTransaction) commit(ctx context.Context) error   { return tx.tx.Com
 func (tx poolTransaction) rollback(ctx context.Context) error { return tx.tx.Rollback(ctx) }
 
 // New constructs a Store without checking whether its migration is installed.
+// The pool is borrowed and never closed; concurrent calls rely on pool safety.
 func New(pool *pgxpool.Pool, options Options) (*Store, error) {
 	if pool == nil {
 		return nil, fmt.Errorf("%w: pgx pool is required", ratelimit.ErrInvalidPolicy)
@@ -112,7 +113,9 @@ func openChecked(ctx context.Context, construct func() (*Store, error)) (*Store,
 	return store, nil
 }
 
-// Check verifies that the package-owned schema migration is installed.
+// Check verifies that rate_limit_states resolves via to_regclass. It does not
+// verify column/index definitions or migration contents. It uses the caller
+// context directly, not Options.Timeout; migration application is caller-owned.
 func (store *Store) Check(ctx context.Context) error {
 	native, ok := store.executor.(*nativeExecutor)
 	if !ok {
@@ -128,7 +131,9 @@ func (store *Store) Check(ctx context.Context) error {
 	return nil
 }
 
-// Cleanup deletes at most batch expired states using SKIP LOCKED.
+// Cleanup deletes at most batch expired states using SKIP LOCKED. It uses the
+// caller context directly and owns no scheduling; removal permits fresh state
+// on later admission. batch must be in 1..MaxCleanupBatch.
 func (store *Store) Cleanup(ctx context.Context, batch int) (int64, error) {
 	if batch < 1 {
 		return 0, fmt.Errorf("%w: cleanup batch must be positive", ratelimit.ErrInvalidRequest)
@@ -213,6 +218,8 @@ func loadStateStrict(ctx context.Context, tx nativeTransaction, key []byte, now 
 	return nil, tx.exec(ctx, deleteStateSQL, key)
 }
 
+// advisoryKey uses a digest prefix only for serialization; collisions can
+// cause extra contention, while the full digest still identifies persisted rows.
 func advisoryKey(key []byte) int64 {
 	return int64(binary.BigEndian.Uint64(key[:8])) // #nosec G115 -- advisory lock identity intentionally retains every SHA-256 prefix bit, including the sign bit.
 }

@@ -30,7 +30,9 @@ type Options struct {
 	Shards int
 }
 
-// Store is a bounded, concurrency-safe, process-local backend.
+// Store is a sharded process-local backend safe for concurrent use after New.
+// Do not copy it after use. The zero value is not usable; no background sweeper
+// or shutdown join is owned. Cardinality is bounded, not total heap bytes.
 type Store struct {
 	shards []shard
 	closed atomic.Bool
@@ -66,7 +68,9 @@ type leaseState struct {
 	expiresAt time.Time
 }
 
-// New validates options and constructs an empty Store.
+// New requires positive MaxKeys and Shards within their configured maxima,
+// with Shards no greater than MaxKeys. It allocates locks/maps and partitions a
+// fixed quota per shard; spare capacity in another shard cannot be borrowed.
 func New(options Options) (*Store, error) {
 	if options.MaxKeys < 1 {
 		return nil, fmt.Errorf("%w: positive cardinality and shard bounds are required", ratelimit.ErrInvalidPolicy)
@@ -125,7 +129,9 @@ func (mutex *contextMutex) LockContext(ctx context.Context) error {
 // Name returns the stable backend identifier.
 func (store *Store) Name() string { return "memory" }
 
-// Admit atomically evaluates one non-concurrency request in process.
+// Admit evaluates one non-concurrency request under its shard lock. Context
+// is checked before an uninterruptible lock wait, not after acquiring it; use
+// AdmitStrict when cancellation during that wait must prevent mutation.
 func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error) {
 	if store.closed.Load() {
 		return ratelimit.Decision{}, ratelimit.ErrUnavailable
@@ -168,7 +174,9 @@ func (target *shard) admitLocked(key string, request ratelimit.Request) (ratelim
 	return admitSliding(current, request)
 }
 
-// Acquire atomically obtains a weighted process-local concurrency lease.
+// Acquire obtains a weighted process-local concurrency lease. Like Admit, its
+// legacy lock wait is not context-interruptible. An active same-ID/cost retry
+// returns the original expiry rather than renewing it.
 func (store *Store) Acquire(ctx context.Context, request ratelimit.LeaseRequest) (ratelimit.Lease, ratelimit.Decision, error) {
 	if store.closed.Load() {
 		return ratelimit.Lease{}, ratelimit.Decision{}, ratelimit.ErrUnavailable
@@ -272,7 +280,8 @@ func (target *shard) releaseLocked(lease ratelimit.Lease) error {
 	return nil
 }
 
-// Len returns the current number of keys across all shards.
+// Len totals keys by locking one shard at a time, not as an atomic all-shard
+// snapshot. It remains available after Close.
 func (store *Store) Len() int {
 	total := 0
 	for index := range store.shards {
@@ -283,7 +292,9 @@ func (store *Store) Len() int {
 	return total
 }
 
-// Sweep removes idle keys and expired leases, returning the keys removed.
+// Sweep removes idle keys and expired leases at caller-supplied now, returning
+// keys removed. idleFor must be positive. Live leases prevent eviction; callers
+// own scheduling and clock choice, and Close makes subsequent sweeps fail.
 func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error) {
 	if store.closed.Load() {
 		return 0, ratelimit.ErrUnavailable
@@ -317,7 +328,9 @@ func (store *Store) Sweep(now time.Time, idleFor time.Duration) (int, error) {
 	return removed, nil
 }
 
-// Close makes future operations return ratelimit.ErrUnavailable.
+// Close marks the store unavailable for subsequent admission, lease and sweep
+// preflight checks. It does not drain admitted operations or clear maps; calls
+// that passed preflight may finish after it returns.
 func (store *Store) Close() error {
 	store.closed.Store(true)
 	return nil
@@ -350,6 +363,9 @@ func (target *shard) getOrCreate(key string, request ratelimit.Request) (*state,
 	return current, nil
 }
 
+// evictOldest protects active leases, but may discard an unexpired rate
+// counter under pressure. Recreating that key starts fresh capacity; MaxKeys
+// does not guarantee retention of every subject throughout a policy period.
 func (target *shard) evictOldest(now time.Time) bool {
 	keys := make([]string, 0, len(target.states))
 	for key, current := range target.states {
@@ -437,6 +453,7 @@ func refill(current *state, request ratelimit.Request) {
 	current.lastRefill = request.Now
 }
 
+// refillDuration rounds upward so a fractional token does not admit early.
 func refillDuration(tokens, remainder uint64, policy ratelimit.Policy) time.Duration {
 	if tokens == 0 {
 		return 0
@@ -549,6 +566,7 @@ func hasActiveLease(leases map[string]leaseState, now time.Time) bool {
 	return false
 }
 
+// floorBoundary uses mathematical floor, including negative Unix times.
 func floorBoundary(value, size int64) int64 {
 	quotient := value / size
 	if value%size == 0 {

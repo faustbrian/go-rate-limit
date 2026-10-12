@@ -8,9 +8,14 @@ import (
 )
 
 // Principal is the narrow identity contract required for key derivation.
-type Principal interface{ Subject() string }
+type Principal interface {
+	// Subject returns an identity whose authenticity the caller has established.
+	Subject() string
+}
 
-// Key derives a bounded hashed key from one validated subject snapshot.
+// Key rejects nil/typed-nil principals and reads Subject once to derive a
+// bounded SHA-256 key. It does not authenticate the principal or contain Subject
+// panics; callers own identity trust and concurrency. Hashing is not encryption.
 func Key(principal Principal) (ratelimit.Key, error) {
 	if nilInterface(principal) {
 		return ratelimit.Key{}, fmt.Errorf("%w: principal is required", ratelimit.ErrInvalidPolicy)

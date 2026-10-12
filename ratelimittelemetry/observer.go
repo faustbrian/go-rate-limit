@@ -49,7 +49,9 @@ func New(options Options) (*Observer, error) {
 	return &Observer{decisions: decisions, duration: duration}, nil
 }
 
-// NewStrict constructs metric instruments after panic-safe provider validation.
+// NewStrict rejects nil/typed-nil providers before constructing instruments.
+// Provider method panics still propagate; the returned instruments are borrowed
+// and no provider shutdown is owned.
 func NewStrict(options Options) (*Observer, error) {
 	if nilInterface(options.MeterProvider) {
 		return nil, fmt.Errorf("%w: meter provider is required", ratelimit.ErrInvalidPolicy)
@@ -70,7 +72,9 @@ func nilInterface(value any) bool {
 	}
 }
 
-// Observe records one bounded decision and its duration.
+// Observe records synchronously with context.Background under this legacy
+// scope, without the canonical adapter's error-kind attribute. Nil/zero observers
+// retain their panic behavior; direct labels are not validated or redacted.
 func (observer *Observer) Observe(observation ratelimit.Observation) {
 	attributes := metric.WithAttributes(
 		attribute.String("rate_limit.policy.id", observation.PolicyID),

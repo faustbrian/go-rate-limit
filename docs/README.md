@@ -1,6 +1,7 @@
 # Documentation
 
 - [Concepts and API](api.md)
+- [Source documentation scope and limitations](source-documentation-audit.md)
 - [Algorithms and precision](algorithms.md)
 - [Backends and consistency](backends.md)
 - [Failure and outage behavior](outages.md)

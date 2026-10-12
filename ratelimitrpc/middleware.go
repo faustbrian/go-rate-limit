@@ -18,9 +18,11 @@ const (
 	MaxRules = 16
 )
 
-// Call contains bounded JSON-RPC admission inputs.
+// Call contains caller-owned JSON-RPC admission inputs. No general payload
+// size validation is performed; selected subjects are bounded during key
+// derivation. Method, Principal and Tenant are not authenticated here.
 type Call struct {
-	// ID is copied to the response without interpretation.
+	// ID is copied by interface assignment, not deep-copied or validated.
 	ID any
 	// Method is the requested JSON-RPC method.
 	Method string
@@ -90,7 +92,10 @@ type Options struct {
 // Middleware wraps a JSON-RPC Handler with ordered admission rules.
 type Middleware func(Handler) Handler
 
-// New validates and copies options before constructing middleware.
+// New copies the bounded ordered rule slice, borrowing callbacks and Service.
+// Earlier successful rules consume capacity even when a later rule fails; there
+// is no cross-rule transaction or rollback. The downstream handler/callbacks
+// must support concurrent calls and non-nil contexts; their panics propagate.
 func New(options Options) (Middleware, error) {
 	if options.Service == nil {
 		return nil, fmt.Errorf("%w: service and bounded rules are required", ratelimit.ErrInvalidPolicy)

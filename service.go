@@ -10,7 +10,9 @@ import (
 // MaxObservers bounds synchronous observation fan-out per decision.
 const MaxObservers = 16
 
-// Backend atomically evaluates admission requests within its documented scope.
+// Backend evaluates admission requests within its documented atomicity scope.
+// The caller owns its lifetime and concurrent-use safety. Method panics are not
+// recovered by services; strict outcome semantics require StrictBackend.
 type Backend interface {
 	// Name returns a stable implementation identifier for decisions and leases.
 	Name() string
@@ -18,13 +20,18 @@ type Backend interface {
 	Admit(context.Context, Request) (Decision, error)
 }
 
-// Service validates requests, applies failure behavior, and emits observations.
+// Service validates requests, applies compatibility failure behavior, and emits
+// observations. Use NewService and a non-nil context; a zero or nil Service is
+// not usable. It owns no clients, goroutines or shutdown. Concurrent calls may
+// invoke the borrowed backend and observers concurrently.
 type Service struct {
 	backend   Backend
 	observers []Observer
 }
 
-// NewService constructs an admission service using backend and observers.
+// NewService constructs a service, filtering nil observers up to MaxObservers.
+// It calls backend.Name during construction and again during operations. Typed
+// nil backends are not rejected; use NewStrictService for strict nil validation.
 func NewService(backend Backend, observers ...Observer) (*Service, error) {
 	if backend == nil || backend.Name() == "" {
 		return nil, fmt.Errorf("%w: backend is required", ErrUnavailable)
@@ -41,7 +48,11 @@ func NewService(backend Backend, observers ...Observer) (*Service, error) {
 	return &Service{backend: backend, observers: filtered}, nil
 }
 
-// Admit evaluates one request without sleeping or retrying.
+// Admit evaluates one request synchronously without sleeping or retrying.
+// Backend success/rejection results are not checked for completeness. Other
+// errors are normalized; non-concurrency FailOpen can admit on availability or
+// deadline errors without knowing whether a backend mutation occurred. Observer
+// calls are synchronous with panics isolated, but blocking is not time-bounded.
 func (service *Service) Admit(ctx context.Context, request Request) (decision Decision, err error) {
 	if err := request.Validate(); err != nil {
 		return Decision{}, err

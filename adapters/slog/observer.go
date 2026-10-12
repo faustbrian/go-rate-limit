@@ -31,7 +31,10 @@ func New(options Options) (*Observer, error) {
 	return &Observer{logger: options.Logger, level: options.Level}, nil
 }
 
-// Observe writes one bounded structured decision record.
+// Observe logs synchronously using context.Background; nil/zero observers are
+// no-ops. It emits an error category instead of backend text. Direct Observation
+// labels are unvalidated; callers own secrecy and sink concurrency/lifetime.
+// Sink panics propagate unless an enclosing service isolates them.
 func (observer *Observer) Observe(observation ratelimit.Observation) {
 	if observer == nil || observer.logger == nil {
 		return

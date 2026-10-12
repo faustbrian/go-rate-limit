@@ -1,5 +1,8 @@
 package valkey
 
+// Script bodies are hand-maintained executable Lua, not generated prose.
+// Strict identities reuse shared bodies with stricter arithmetic/state checks;
+// keep compatibility branches separate from released admission semantics.
 const admitScript = `local strict = false
 ` + admitScriptBody
 const strictAdmitScript = `local strict = true

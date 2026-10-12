@@ -16,7 +16,10 @@ const (
 	ReasonBackendUnavailable Reason = "backend_unavailable"
 )
 
-// Decision describes the complete, observable result of admission.
+// Decision describes admission metadata. Check the accompanying error before
+// proceeding; zero values are not successful admission. Remaining and retry
+// times are snapshots, not reservations against concurrent calls or clock skew.
+// StrictService validates result shape; Service preserves legacy backend data.
 type Decision struct {
 	// Allowed reports whether the operation may proceed.
 	Allowed bool

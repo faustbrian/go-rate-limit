@@ -13,7 +13,8 @@ type Principal interface {
 	Subject() string
 }
 
-// KeyStrict derives a key after panic-safe principal validation.
+// KeyStrict rejects nil/typed-nil principals and snapshots Subject once.
+// Subject panics propagate; identity authenticity remains the caller's concern.
 func KeyStrict(principal Principal) (ratelimit.Key, error) {
 	if nilInterface(principal) {
 		return ratelimit.Key{}, fmt.Errorf("%w: principal is required", ratelimit.ErrInvalidPolicy)
@@ -41,7 +42,10 @@ func nilInterface(value any) bool {
 	}
 }
 
-// Key derives a bounded, irreversibly hashed key from principal.
+// Key derives a bounded SHA-256 key, checking only a nil interface. It calls
+// Subject once for validation and again for derivation; values can differ.
+// Typed-nil principals and callback panics retain their compatibility behavior.
+// KeyStrict snapshots once; neither helper authenticates the identity.
 func Key(principal Principal) (ratelimit.Key, error) {
 	if principal == nil {
 		return ratelimit.Key{}, fmt.Errorf("%w: authenticated principal is required", ratelimit.ErrInvalidKey)

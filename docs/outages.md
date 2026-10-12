@@ -9,7 +9,9 @@ availability is more important than duplicate admission and downstream work
 can tolerate overload. It applies only to ErrUnavailable and ErrDeadline. State
 corruption and arithmetic overflow always fail closed because admitting on an
 integrity failure would create an attacker-controlled bypass. Fail-open does
-not create backend state and must be observable.
+not itself create additional backend state and must be observable. The legacy
+Service can fail open after an ambiguous backend error; it cannot establish that
+the backend did not mutate. StrictService never fails open on an unknown result.
 
 Timeouts include context cancellation and backend deadline expiry. The core
 does not retry or sleep because retrying an unknown distributed result can
@@ -22,8 +24,11 @@ ErrOutcomeUnknown before ErrCanceled and ErrDeadline, then reconcile backend
 state or use separately proven idempotency before retrying.
 
 Concurrency acquisition is the exception only for the same LeaseID, key,
-policy ID, and Cost: that exact retry is idempotent. Reusing the ID with a
-different Cost is rejected as non-owned rather than consuming or rewriting
+policy ID, and Cost while the lease is active: that exact retry is idempotent
+and preserves the original expiry, not a renewal. After expiry/pruning, the same
+ID can acquire a new lease; it is not durable application deduplication.
+Reusing the ID with a different Cost is rejected as non-owned rather than
+consuming or rewriting
 capacity.
 
 Public errors preserve only stable classifications through errors.Is. Raw

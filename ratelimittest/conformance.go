@@ -22,10 +22,15 @@ type BackendFixture struct {
 	Leases ratelimit.LeaseBackend
 }
 
-// BackendFactory constructs isolated state for one conformance subtest.
+// BackendFactory constructs fresh isolated state per subtest and registers
+// cleanup with testing.TB. It must supply a usable Backend and bound operations;
+// the helpers do not create a per-call timeout or own backend resources.
 type BackendFactory func(testing.TB) BackendFixture
 
-// RunBackendConformance compares a backend with the rational reference model.
+// RunBackendConformance compares selected deterministic legacy admission and
+// revision/lease scenarios with the reference model. Optional lease cases skip
+// when the fixture declares no support; that is not proof of lease correctness.
+// It does not cover every strict outcome, persistence restart or clock range.
 func RunBackendConformance(t *testing.T, factory BackendFactory) {
 	t.Helper()
 	for _, algorithm := range []ratelimit.Algorithm{
@@ -142,8 +147,10 @@ func assertSameDecision(t testing.TB, got ratelimit.Decision, gotErr error, want
 	}
 }
 
-// RunBackendAtomicity proves exact same-key capacity and idempotent lease retry
-// behavior under concurrent contention.
+// RunBackendAtomicity checks many-key, same-key and idempotent lease scenarios
+// with 64 concurrent workers. It joins all workers with no independent timeout;
+// the factory/backend and enclosing test budget must bound completion. Selected
+// assertions are not general linearizability or distributed durability proof.
 func RunBackendAtomicity(t *testing.T, factory BackendFactory) {
 	t.Helper()
 	t.Run("many-key-admission", func(t *testing.T) {
