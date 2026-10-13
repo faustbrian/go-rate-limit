@@ -114,3 +114,12 @@ inspection are completed before the local commit; details are in the local
 handoff rather than a second evidence framework. No service, race, active fuzz,
 mutation or performance qualification is claimed; remote delivery and exact-main
 CI remain coordinator-owned.
+
+## Objective Enforcement
+
+The checksum-pinned public Tools v2.4.0 verifier now supplies
+`make source-docs-check` as a prerequisite of the existing local and CI Make
+routes. Ordinary shared CI selects strict source-documentation checking and
+requires its result. Native prerequisites, operation budgets, security and
+release controls are retained. Hosted exact-head evidence is recorded by the
+coordination ledger; configuration alone does not establish green delivery.
