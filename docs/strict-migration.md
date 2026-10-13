@@ -2,8 +2,9 @@
 
 [Documentation index](README.md)
 
-Once v2.0.0 is published, install and version the root module. The
-successor adapters are packages in
+The public v2.0.0 release is available. Install and version the root module;
+current source may select newer dependencies than that immutable release.
+The successor adapters are packages in
 `github.com/faustbrian/go-rate-limit/v2`; they have no independent module, tag,
 or release version.
 
