@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[Documentation index](README.md)
+
 ## Every request is rejected
 
 Check Cost, MaxCost, Capacity+Burst, explicit Now, key derivation, clock mode,
@@ -36,3 +38,5 @@ throughput.
 
 The rate-limit middleware never acknowledges work. Verify the queue adapter
 maps Deferred to release/nack and does not treat it as success.
+
+Continue with [Concepts and API](api.md).

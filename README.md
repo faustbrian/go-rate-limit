@@ -2,9 +2,8 @@
 
 [![CI](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/badge/CodeQL-required-blue)](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-100%25_required-blue)](CONTRIBUTING.md#verification)
 [![Mutation](https://img.shields.io/badge/mutation-local_and_scheduled-blue)](CONTRIBUTING.md#verification)
-[![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
+[![Documentation](https://img.shields.io/badge/docs-structural_checks_in_CI-blue)](docs/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit/v2.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit/v2)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-rate-limit?sort=semver)](https://github.com/faustbrian/go-rate-limit/releases)
 [![Go](https://img.shields.io/badge/go-1.27.0-00ADD8?logo=go)](https://go.dev/)
@@ -18,9 +17,9 @@ PostgreSQL backends.
 The module lifecycle is **active** and its API maturity is **stable**. Go
 1.27.0 remains the minimum supported Go version. CI uses the patched Go
 1.27.2 runtime; applications should use the latest supported Go security patch.
-The v2 module path is `github.com/faustbrian/go-rate-limit/v2`. Once
-v2.0.0 is published, callers of the PostgreSQL `GoMigration` adapter
-must use it with the matching `go-migrations/v2` major version.
+The published v2 module path is `github.com/faustbrian/go-rate-limit/v2`.
+Callers of the PostgreSQL `GoMigration` adapter must use it with the
+matching `go-migrations/v2` major version.
 
 This library owns inbound request, RPC, queue-admission, and application
 operation limits. It does not own authorization, billing quotas, WAF rules,
@@ -96,8 +95,8 @@ Start at [docs/README.md](docs/README.md). The API and adoption guides cover
 algorithms, consistency, failure behavior, transports, migrations, operations,
 security, performance, and troubleshooting.
 
-See the versioned [Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/README.md)
-and [resilience package-family guidance](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/design-language.md#package-families-and-selection)
+See the versioned [Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.8.4/docs/ecosystem/README.md)
+and [resilience package-family guidance](https://github.com/faustbrian/go-library-tools/blob/v1.8.4/docs/ecosystem/design-language.md#package-families-and-selection)
 for the shared design language this module follows.
 
 ## Local verification

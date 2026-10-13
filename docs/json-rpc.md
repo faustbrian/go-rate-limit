@@ -1,5 +1,7 @@
 # JSON-RPC middleware
 
+[Documentation index](README.md)
+
 ratelimitrpc composes at most 16 ordered rules. Built-in subject functions
 cover global service, authenticated principal, method, and tenant limits.
 Custom SubjectFunc and Cost callbacks support operation-specific policy.
@@ -11,3 +13,5 @@ policy internals appear in the error.
 
 The package defines a narrow Handler interface so a jsonrpc adapter can map
 its request type without creating a reverse dependency.
+
+Continue with [Concepts and API](api.md).

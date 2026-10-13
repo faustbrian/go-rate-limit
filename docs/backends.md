@@ -1,5 +1,7 @@
 # Backends and consistency
 
+[Documentation index](README.md)
+
 ## Memory
 
 Memory is process-local. MaxKeys and Shards are mandatory. Each shard has a
@@ -85,3 +87,5 @@ deployment. Asynchronous replicas are not admission authorities. Independent
 regions enforce independent capacity unless requests share one synchronous
 authority. Partitions become explicit backend errors and follow policy failure
 mode; they never merge hidden counters later.
+
+Continue with [Concepts and API](api.md).

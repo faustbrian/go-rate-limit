@@ -1,5 +1,7 @@
 # Security model
 
+[Documentation index](README.md)
+
 Threats include spoofed proxy headers, alternate-credential bypass, adversarial
 key cardinality, hot keys, integer overflow, clock rollback, revision-based
 capacity doubling, hash collisions, script injection, backend response

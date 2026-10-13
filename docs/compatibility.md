@@ -1,5 +1,7 @@
 # Compatibility and residuals
 
+[Documentation index](README.md)
+
 The strict APIs and successor adapters are additive. The legacy packages stay
 supported for the longer of 180 days after the replacements are publicly
 consumable or two published stable minor releases containing both old and new
@@ -30,3 +32,5 @@ The v2 module retains the legacy adapter packages while changing the public
 must update rate-limit and migrations import paths together. No
 `adapters/jsonrpc` package, nested module, or independent successor tag is
 part of this release.
+
+Continue with [Concepts and API](api.md).

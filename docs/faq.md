@@ -1,5 +1,7 @@
 # FAQ
 
+[Documentation index](README.md)
+
 ## Is an allowed decision authorization?
 
 No. authorization owns permission decisions.
@@ -38,3 +40,5 @@ operation returns. `http-client` still owns outbound request pacing, retries,
 and transport policy. Do not acquire and release around individual retry
 attempts because that would let one logical operation evade the concurrency
 bound.
+
+Continue with [Concepts and API](api.md).

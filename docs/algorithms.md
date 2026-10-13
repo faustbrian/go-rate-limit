@@ -1,5 +1,7 @@
 # Algorithms and precision
 
+[Documentation index](README.md)
+
 ## Token bucket
 
 Capacity tokens refill per Period with optional Burst. Weighted costs consume
@@ -45,3 +47,5 @@ cannot guarantee cancellation or capacity.
 Capacity plus Burst is limited to 1,024 for concurrency policies. Since Cost
 is a positive integer, this is also the maximum number of live lease records
 for one policy/key and bounds cleanup scans and persisted state size.
+
+Continue with [Concepts and API](api.md).

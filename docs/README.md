@@ -1,5 +1,7 @@
 # Documentation
 
+[Package README](../README.md)
+
 - [Concepts and API](api.md)
 - [Source documentation scope and limitations](source-documentation-audit.md)
 - [Algorithms and precision](algorithms.md)
@@ -20,3 +22,8 @@
 - [Performance guide](performance.md)
 - [Troubleshooting](troubleshooting.md)
 - [FAQ](faq.md)
+
+## Ecosystem navigation
+
+See the [versioned Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.8.4/docs/ecosystem/README.md) for package
+selection, explicit ownership, and compatibility guidance.

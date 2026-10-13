@@ -1,5 +1,7 @@
 # Failure and outage behavior
 
+[Documentation index](README.md)
+
 FailClosed is the default and returns an unavailable decision when the backend
 cannot decide. Use it for login, abuse prevention, scarce resources, and every
 concurrency lease.
@@ -39,3 +41,5 @@ HTTP maps rejection to 429 and backend failure to 503. JSON-RPC uses -32029
 for rejection and -32030 for unavailable/invalid admission inputs. Queue
 middleware returns a typed Deferred error; the queue adapter retains retry and
 acknowledgement ownership.
+
+Continue with [Concepts and API](api.md).

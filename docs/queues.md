@@ -1,5 +1,7 @@
 # Queue admission
 
+[Documentation index](README.md)
+
 New callers use `github.com/faustbrian/go-rate-limit/v2/adapters/queue`. Construct
 middleware with a `*ratelimit.StrictService`, then validate the downstream
 handler with the checked `Wrap` method:

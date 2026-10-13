@@ -1,5 +1,7 @@
 # Trusted proxies
 
+[Documentation index](README.md)
+
 The HTTP extractor trusts X-Forwarded-For only when RemoteAddr belongs to an
 explicit TrustedProxies prefix. It validates every hop, allows at most 32 hops
 and 4096 header bytes, walks from the trusted edge toward the client, and
@@ -14,3 +16,5 @@ the built-in extractor does this automatically.
 Alternate credential sources must converge on one key function. Otherwise a
 caller could bypass a principal limit by switching between IP, API key, cookie,
 or bearer extraction paths.
+
+Continue with [Concepts and API](api.md).

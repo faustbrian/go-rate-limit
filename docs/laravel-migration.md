@@ -1,5 +1,7 @@
 # Laravel RateLimiter migration
 
+[Documentation index](README.md)
+
 Map each Laravel limiter name to a stable Policy.ID and explicit Revision.
 Normalize legacy names and revisions to at most 64 bytes using only ASCII
 letters, digits, dash, underscore, dot, and colon before constructing a
@@ -28,3 +30,5 @@ outbound provider's concurrent-operation limit must span all replicas, the
 application may additionally hold a distributed concurrency lease around the
 complete logical provider operation. Authorization remains in authorization
 and billable quotas require a durable usage ledger.
+
+Continue with [Concepts and API](api.md).

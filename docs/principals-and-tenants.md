@@ -1,5 +1,7 @@
 # Principals and tenants
 
+[Documentation index](README.md)
+
 New callers use
 `github.com/faustbrian/go-rate-limit/v2/adapters/authentication`. Its `Key`
 helper depends only on:
@@ -25,3 +27,5 @@ remains supported through the compatibility interval. Its `Key` helper retains
 legacy typed-nil and repeated-successful-`Subject` behavior; `KeyStrict` is the
 checked compatibility-path alternative. New integrations should use the
 successor package.
+
+Continue with [Concepts and API](api.md).

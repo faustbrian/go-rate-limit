@@ -1,5 +1,7 @@
 # Operations runbook
 
+[Documentation index](README.md)
+
 ## Signals
 
 Alert on rejection ratio by controlled policy ID, fail-open decisions,
@@ -34,3 +36,5 @@ count. Memory state cannot be reconstructed as cluster-wide truth.
 Administrative inspection should show policy metadata and aggregate counts.
 Do not return raw credentials, IPs, principals, tenants, hashes that can be
 joined to sensitive data, or individual lease IDs by default.
+
+Continue with [Concepts and API](api.md).

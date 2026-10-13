@@ -1,5 +1,7 @@
 # Performance guide
 
+[Documentation index](README.md)
+
 Use memory for the lowest latency when process-local semantics are correct.
 Use Valkey for high-throughput shared limits. PostgreSQL is for transactional
 coordination and must not be selected as the default without workload evidence.
@@ -59,3 +61,5 @@ the expires_at index, LIMIT, and SKIP LOCKED, so reclamation never requires a
 full unbounded application scan. Connection and goroutine budgets remain
 owned by pgx, valkey-go, and the application; this package starts no background
 goroutines and performs no internal retry or wait loop.
+
+Continue with [Concepts and API](api.md).

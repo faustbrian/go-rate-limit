@@ -1,5 +1,7 @@
 # Deployment and policy revisions
 
+[Documentation index](README.md)
+
 State identity is Policy.ID plus the derived Key. Revision is stored inside
 that state, not appended to the storage key. A rolling deployment therefore
 does not create a fresh bucket and silently double capacity.
@@ -29,3 +31,5 @@ new keys are independent.
 
 For multi-region deployments, document the authority topology before rollout.
 Do not direct decisions to asynchronous read replicas.
+
+Continue with [Concepts and API](api.md).

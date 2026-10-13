@@ -1,5 +1,7 @@
 # Concepts and API
 
+[Documentation index](README.md)
+
 Policy is an immutable value created from PolicySpec. Identity consists of ID
 and Revision. Algorithm, Capacity, Burst, Period, MaxCost, FailureMode,
 Consistency, and Lease are explicit. Invalid or ambiguous policies are
