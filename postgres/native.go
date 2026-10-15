@@ -173,7 +173,14 @@ func (executor *nativeExecutor) admit(ctx context.Context, key []byte, request r
 	}
 	encoded := encodeState(next)
 	ttl := max(request.Policy.Period()*2, time.Second)
-	if err := tx.exec(ctx, upsertStateSQL, key, encoded, request.Now.Add(ttl), request.Now); err != nil {
+	effective := request.Now
+	if request.Policy.Algorithm() == ratelimit.TokenBucket {
+		ttl = postgresAdmissionTTL(request.Policy)
+		// Mutation clamps backwards client observations in its own request
+		// copy. Expiry must follow that persisted time, not the borrowed time.
+		effective = time.UnixMicro(next.ObservedMicros).UTC()
+	}
+	if err := tx.exec(ctx, upsertStateSQL, key, encoded, effective.Add(ttl), effective); err != nil {
 		return ratelimit.Decision{}, err
 	}
 	if err := tx.commit(ctx); err != nil {

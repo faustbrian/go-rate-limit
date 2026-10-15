@@ -5,7 +5,19 @@ versioning after v1.0.0.
 
 ## Unreleased
 
+### Added
+
+- Add explicit strict atomic multi-bucket token admission with original-command
+  replay. PostgreSQL migration 2 retains terminal success and rejection receipts;
+  apply it after the existing schema migration before selecting this backend.
+  Unknown outcomes require the same command and intent, never a new debit ID.
+  Existing per-item batches, memory and Valkey backends remain unchanged.
+
 ### Changed
+
+- Retain PostgreSQL token state through its full burst refill horizon, including
+  compatibility writers and backwards client clock observations, so cleanup
+  cannot restore depleted capacity prematurely.
 
 - Clarify source contracts for strict versus compatibility outcomes, borrowed
   collaborators, cancellation/cleanup budgets, lease expiry, memory eviction,

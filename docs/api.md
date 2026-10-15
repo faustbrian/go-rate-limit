@@ -34,12 +34,23 @@ known to precede dispatch; ErrDeadline preserves deadline compatibility;
 ErrOutcomeUnknown is never evidence that retry is safe.
 
 Batch accepts at most 256 requests. AtomicityPerItem validates every item
-before execution, then reports each committed decision. All-or-nothing is
-explicitly unsupported at the backend-neutral service layer.
+before execution, then reports each committed decision. All-or-nothing remains
+unsupported by these existing per-item methods.
 
 StrictService.Batch additionally returns attempted input indexes and a
 StrictBatchError containing ordered BatchItemError values, so partial dispatch
 can be reconciled without parsing error strings.
+
+`StrictService.AdmitAtomicBatch` is a separate optional contract requiring a
+`StrictAtomicBatchBackend`. It accepts one stable deployment-wide command and
+1..16 distinct strong, fail-closed token buckets with a common observation.
+Only nil error plus `Allowed` permits protected work. A rejection debits none;
+an unknown outcome permits no work and requires the same command and unchanged
+ordered policy/key/cost intent for reconciliation. Retry time does not renew
+the original decision. Correlation is not authorization; callers must prevent
+untrusted callers from selecting another operation's debit command. No fallback
+to per-item admission, memory or Valkey is provided. Backend panics and incomplete
+or contradictory atomic results become redacted unknown outcomes.
 
 ## Callback concurrency and ownership
 

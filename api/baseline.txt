@@ -37,6 +37,9 @@ const (
 	// MaxStrictBatchErrorBytes bounds the largest possible strict batch error string.
 	MaxStrictBatchErrorBytes = 11007
 )
+const MaxAtomicBatchSize = 16
+    MaxAtomicBatchSize bounds one native transaction's admission dimensions.
+
 const MaxBatchSize = 256
     MaxBatchSize bounds memory, backend work, and observation fan-out per call.
 
@@ -113,6 +116,54 @@ const (
 	// Concurrency admits weighted work while an explicit lease is held.
 	Concurrency Algorithm = "concurrency"
 )
+type AtomicBatchDecision struct {
+	// CommandID identifies the unchanged caller command, including on unknown.
+	CommandID string
+	// Allowed grants admission only together with a nil error.
+	Allowed bool
+	// Decisions is an owned input-ordered copy of the original bucket outcomes.
+	Decisions []Decision
+}
+    AtomicBatchDecision is the original command's indivisible admission result.
+    Only nil error plus Allowed permits protected work. Decisions preserve input
+    order; successful entries describe committed debits. Rejected entries are
+    all non-allowed: exhausted buckets have ReasonLimited; otherwise sufficient
+    ones have ReasonAtomicRejected and unchanged observed capacity. No bucket
+    was debited on ErrRejected. A command-only result with an error grants no
+    capacity and may require reconciliation; it is not a known rollback. Copies
+    returned by the service own their decision slice, with no backend alias.
+
+type AtomicBatchRequest struct {
+	// CommandID is copied deployment-wide correlation, not permission to debit.
+	CommandID string
+	// Requests is borrowed for the call; order is part of original intent.
+	Requests []Request
+}
+    AtomicBatchRequest is one stable, caller-owned debit command. CommandID is
+    1..128 ASCII HTTP-token bytes, unique within the backend deployment; it is
+    correlation, not a secret or authority. Retain it and the unchanged ordered
+    Requests across unknown outcomes. Requests has 1..16 distinct policy/key
+    identities, strong fail-closed token buckets and one clock observation.
+    Concurrent caller mutation is forbidden. Native owners must atomically bind
+    the command to complete policy/key/cost intent, retain terminal decisions,
+    reject changed intent and never redebit a matching committed/rejected
+    command. Now is a client-clock observation, not a retry freshness lease;
+    database-clock owners must not reset original decision time or include retry
+    time in intent.
+
+func (AtomicBatchRequest) Format(s fmt.State, _ rune)
+    Format redacts bucket keys and command correlation for every verb.
+
+func (AtomicBatchRequest) MarshalJSON() ([]byte, error)
+    MarshalJSON denies implicit export of key-bearing input.
+
+func (AtomicBatchRequest) MarshalText() ([]byte, error)
+    MarshalText denies implicit text/map-key input export.
+
+func (r AtomicBatchRequest) Validate() error
+    Validate checks complete bounded intrinsic input before backend dispatch.
+    It authenticates neither command ownership nor a durable replay intent.
+
 type Atomicity string
     Atomicity defines the guarantee requested for a batch.
 
@@ -426,6 +477,10 @@ const (
 	// ReasonOutcomeUnknown identifies an ambiguous post-dispatch result.
 	ReasonOutcomeUnknown Reason = "outcome_unknown"
 )
+const ReasonAtomicRejected Reason = "atomic_rejected"
+    ReasonAtomicRejected means another bucket exhausted the atomic request.
+    No capacity was debited, including this otherwise sufficient bucket.
+
 type Request struct {
 	// Policy contains immutable admission semantics.
 	Policy Policy
@@ -478,6 +533,24 @@ func (service *Service) Batch(ctx context.Context, batch BatchRequest) (BatchDec
 
 func (service *Service) Release(ctx context.Context, lease Lease) error
     Release relinquishes a lease through the backend that owns it.
+
+type StrictAtomicBatchBackend interface {
+	StrictBackend
+	// AdmitAtomicStrict owns atomic admission and original-command reconciliation.
+	AdmitAtomicStrict(context.Context, AtomicBatchRequest) (AtomicBatchDecision, error)
+}
+    StrictAtomicBatchBackend optionally extends a strict backend with a real
+    all-or-nothing transaction and original-command outcome owner. It must bound
+    IO, serialize overlapping buckets without deadlock, use one authoritative
+    clock, preserve earlier input intent and return original terminal decisions
+    on replay even after refill. Never emulate this with per-item Admit calls.
+    Unknown COMMIT acknowledgment returns zero decision plus UnknownOutcome;
+    resubmitting the same command queries/reconciles its retained durable
+    outcome without a second debit. Before-dispatch failure declarations have
+    StrictBackend semantics; backend errors must contain no input or underlying
+    diagnostics. Implementations must neither retain/mutate the borrowed input
+    slice nor mutate returned slices after return. No resource ownership
+    transfers through this port.
 
 type StrictBackend interface {
 	Backend
@@ -552,6 +625,17 @@ func (service *StrictService) Admit(ctx context.Context, request Request) (Decis
     only known pre-dispatch deadlines or safe availability failures can fail
     open for a non-concurrency policy. No unsafe error tree is traversed or
     formatted.
+
+func (s *StrictService) AdmitAtomicBatch(ctx context.Context, r AtomicBatchRequest) (out AtomicBatchDecision, err error)
+    AdmitAtomicBatch dispatches once to an explicit native atomic backend,
+    never to the existing per-item Batch. Invalid/unsupported input and
+    pre-cancellation cause no dispatch. Complete original commitment survives
+    caller cancellation after dispatch; cancellation alone never proves
+    rollback. Incomplete, partial, panicking or contradictory outputs become a
+    redacted unknown outcome with original correlation only. Fail-open policies
+    and fallback are unsupported. Native bounded IO and durable replay remain
+    backend responsibilities. This boundary cannot certify an implementation's
+    SQL atomicity merely from output.
 
 func (service *StrictService) Batch(ctx context.Context, batch BatchRequest) (StrictBatchDecision, error)
     Batch validates every item before dispatch, then evaluates in order
@@ -982,6 +1066,13 @@ type Migration struct {
 }
     Migration is the portable SQL definition owned by this package.
 
+func AtomicSchemaMigration() Migration
+    AtomicSchemaMigration is additive migration 2 for strict atomic commands.
+    Install it after SchemaMigration. Original command digests and receipts
+    are retained indefinitely: deleting them would permit a delayed retry to
+    debit again. Retention/archival must preserve a terminal command tombstone;
+    this package never expires or automatically cleans these command records.
+
 func SchemaMigration() Migration
     SchemaMigration returns the package-owned PostgreSQL schema migration.
 
@@ -1027,6 +1118,20 @@ func (store *Store) AcquireStrict(ctx context.Context, request ratelimit.LeaseRe
 
 func (store *Store) Admit(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
     Admit evaluates one non-concurrency request in a locked transaction.
+
+func (store *Store) AdmitAtomicStrict(ctx context.Context, request ratelimit.AtomicBatchRequest) (ratelimit.AtomicBatchDecision, error)
+    AdmitAtomicStrict admits every input bucket or none in one primary database
+    transaction. It requires NewStrict/OpenStrict and AtomicSchemaMigration.
+    Stable commands bind complete ordered policy/key/cost intent and clock
+    profile, not retry Now. Matching retries return the original committed
+    or rejected receipt; changed intent returns ErrInvalidRequest without
+    another debit. Commands are deployment-wide, caller-authorized correlation,
+    not credentials. ServerClock observes once after all locks; ClientClock
+    is intended only for trusted callers. Neither command nor original keys
+    are stored in plaintext. A lost commit acknowledgement grants no admission
+    and returns UnknownOutcome; reconcile by resubmitting the same original
+    command and intent, never a new ID. Pool ownership remains with the caller.
+    No automatic retry or fail-open path.
 
 func (store *Store) AdmitStrict(ctx context.Context, request ratelimit.Request) (ratelimit.Decision, error)
     AdmitStrict evaluates under a per-key advisory transaction lock and row

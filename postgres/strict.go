@@ -343,7 +343,7 @@ func (executor *nativeExecutor) admitStrict(ctx context.Context, key []byte, req
 	}
 	effective := time.UnixMicro(next.ObservedMicros).UTC()
 	encoded := encodeState(next)
-	ttl := postgresStateTTL(request.Policy.Period())
+	ttl := postgresAdmissionTTL(request.Policy)
 	if err := tx.exec(ctx, upsertStateSQL, key, encoded, effective.Add(ttl), effective); err != nil {
 		return ratelimit.Decision{}, postgresPrecommitCategory(ctx, err)
 	}
@@ -458,6 +458,17 @@ func postgresStateTTL(duration time.Duration) time.Duration {
 		return time.Duration(math.MaxInt64)
 	}
 	return max(duration*2, time.Second)
+}
+
+// Token bursts may take more than two periods to replenish. Expiring a
+// depleted bucket sooner silently restores unavailable capacity. All writers
+// sharing bucket storage retain at least its checked full-refill horizon.
+func postgresAdmissionTTL(policy ratelimit.Policy) time.Duration {
+	ttl := postgresStateTTL(policy.Period())
+	if policy.Algorithm() == ratelimit.TokenBucket {
+		ttl = max(ttl, tokenDuration(policy.Limit(), 0, policy))
+	}
+	return ttl
 }
 
 func validateStrictDecisionTime(decision ratelimit.Decision, effective time.Time) error {

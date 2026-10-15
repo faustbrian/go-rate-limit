@@ -80,6 +80,17 @@ provenance in algorithm-unused fields from the released v1 document shape, so
 a released v1 reader can decode and round-trip strict-written rows during
 caller rollback without interpreting that metadata.
 
+For `AdmitAtomicStrict`, install `AtomicSchemaMigration()` (version 2) after
+`SchemaMigration()`. One primary transaction locks the command before sorted
+bucket locks and stores every terminal decision, including rejection. A changed
+intent conflicts; unchanged replay returns the original decision even after
+refill or restart. A lost commit acknowledgment is unknown, not rollback.
+Command digests and receipts are retained indefinitely: archival must preserve
+a terminal tombstone or delayed retries could debit again. `Cleanup` does not
+remove these command records. Token state shared by atomic and single-item
+writers retains at least its complete burst refill horizon. This is admission
+only, not a transaction containing the caller's protected application mutation.
+
 ## Regions and partitions
 
 Strong consistency is limited to the selected backend's authoritative
