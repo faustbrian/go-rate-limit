@@ -28,6 +28,12 @@ type Options struct {
 	MaxKeys int
 	// Shards controls lock striping and must not exceed MaxKeys.
 	Shards int
+	// RejectOnCapacity disables automatic eviction at a shard's cardinality
+	// bound. New keys return ErrUnavailable without resetting existing budgets;
+	// existing keys remain usable. The caller owns explicit Sweep reclamation
+	// and must choose an idle interval safe for its policies. The default false
+	// preserves deterministic oldest-state eviction (except active leases).
+	RejectOnCapacity bool
 }
 
 // Store is a sharded process-local backend safe for concurrent use after New.
@@ -39,9 +45,10 @@ type Store struct {
 }
 
 type shard struct {
-	mu      contextMutex
-	maxKeys int
-	states  map[string]*state
+	mu               contextMutex
+	maxKeys          int
+	rejectOnCapacity bool
+	states           map[string]*state
 }
 
 type state struct {
@@ -93,6 +100,7 @@ func New(options Options) (*Store, error) {
 	for index := range store.shards {
 		store.shards[index].mu = newContextMutex()
 		store.shards[index].maxKeys = base
+		store.shards[index].rejectOnCapacity = options.RejectOnCapacity
 		if index < extra {
 			store.shards[index].maxKeys++
 		}
@@ -350,7 +358,7 @@ func (target *shard) getOrCreate(key string, request ratelimit.Request) (*state,
 		return current, nil
 	}
 	if len(target.states) == target.maxKeys {
-		if !target.evictOldest(request.Now) {
+		if target.rejectOnCapacity || !target.evictOldest(request.Now) {
 			return nil, ratelimit.ErrUnavailable
 		}
 	}

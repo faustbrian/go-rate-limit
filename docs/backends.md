@@ -15,6 +15,13 @@ cancellation before mutation; legacy methods check only before waiting.
 Policy.Consistency does not enforce that this process-local backend is suitable
 for a policy. The race suite and hot-key benchmarks exercise selected contention.
 
+Set `Options.RejectOnCapacity` to deny a new key with `ErrUnavailable` instead
+of evicting a live rate counter at the shard limit. Existing keys keep their
+consumption and can still be evaluated. Reclamation requires explicit caller-
+owned `Sweep` with an idle interval safe for every selected policy; this option
+does not infer expiry or create a background worker. The default eviction
+behavior is unchanged. Neither profile replaces shared strong authority.
+
 ## Valkey
 
 Valkey 9+ is required and Redis compatibility is not claimed. valkey-go is the

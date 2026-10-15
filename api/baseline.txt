@@ -955,6 +955,12 @@ type Options struct {
 	MaxKeys int
 	// Shards controls lock striping and must not exceed MaxKeys.
 	Shards int
+	// RejectOnCapacity disables automatic eviction at a shard's cardinality
+	// bound. New keys return ErrUnavailable without resetting existing budgets;
+	// existing keys remain usable. The caller owns explicit Sweep reclamation
+	// and must choose an idle interval safe for its policies. The default false
+	// preserves deterministic oldest-state eviction (except active leases).
+	RejectOnCapacity bool
 }
     Options configures bounded process-local storage.
 

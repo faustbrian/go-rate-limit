@@ -7,6 +7,11 @@ versioning after v1.0.0.
 
 ### Added
 
+- Add opt-in memory `RejectOnCapacity` for bounded emergency admission that
+  denies new keys instead of evicting consumed counters. Existing counters
+  remain usable; callers explicitly own safe idle reclamation through `Sweep`.
+  Default eviction behavior is unchanged.
+
 - Add explicit strict atomic multi-bucket token admission with original-command
   replay. PostgreSQL migration 2 retains terminal success and rejection receipts;
   apply it after the existing schema migration before selecting this backend.
