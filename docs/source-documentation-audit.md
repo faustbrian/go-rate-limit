@@ -3,8 +3,9 @@
 [Documentation index](README.md)
 
 This is a dated record of the audited v2 base. Version 3 later removed the
-five deprecated packages it lists and moved the proxy fuzz path to
-`adapters/http`; it is not refreshed for v3.
+five deprecated packages it lists, including the legacy trusted-proxy fuzz
+target, and registered the atomic receipt fuzz target in its place; it is not
+refreshed for v3.
 
 ## Owner, acceptance and selected proof
 

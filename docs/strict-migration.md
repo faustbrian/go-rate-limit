@@ -33,8 +33,12 @@ import (
 | `ratelimitqueue` | `adapters/queue` |
 | `ratelimittelemetry` | `adapters/otel` |
 
-Version 3 removed the legacy paths; the v2 line keeps them for their announced
-interval. Successors own their named Go types, so reflection identity and type
+Version 3 removed the legacy paths before their announced support window
+ended; published v2 releases keep them and no further v2 releases are planned.
+The HTTP and queue adapters take a `*ratelimit.StrictService` built from a
+`StrictBackend` and return a `*Middleware` whose `Wrap` reports an error,
+instead of taking a `*ratelimit.Service` and returning a plain wrapper;
+`ratelimittelemetry.NewStrict` becomes `ratelimitotel.New`. Successors own their named Go types, so reflection identity and type
 assertions change at migration. The OTel instrumentation scope follows the
 module major and is now `github.com/faustbrian/go-rate-limit/v3/adapters/otel`;
 update dashboards and views that select an earlier scope. `adapters/otel` also
@@ -119,7 +123,8 @@ successful lease expiry must be later than it and equal the decision reset.
 
 Strict APIs reject typed-nil required interfaces before invocation. The
 authentication adapter's `ratelimitauthentication.Key` snapshots `Subject`
-once, and `ratelimitotel.New` rejects a typed-nil provider. The HTTP and queue middleware expose
+once and keys on that value, where the removed `ratelimitprincipal.Key` read it
+twice and keyed on the second read, and `ratelimitotel.New` rejects a typed-nil provider. The HTTP and queue middleware expose
 checked `Wrap` methods that reject nil and typed-nil handlers before calling
 them. Optional callbacks retain their documented defaults.
 

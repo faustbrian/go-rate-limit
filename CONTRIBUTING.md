@@ -74,7 +74,7 @@ make -f verification/package.mk integration
 ```
 
 `make check-full` retains the complete scheduled/full assurance contract,
-including all five original fuzz budgets, live integration and benchmark
+including all five registered fuzz budgets, live integration and benchmark
 thresholds. Release qualification remains `golib release dry-run --module .`.
 Select full and release checks for their named risk or release boundary, not
 every commit. Report unavailable, skipped and failed checks honestly; a bounded

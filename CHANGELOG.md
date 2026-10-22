@@ -23,7 +23,10 @@ versioning after v1.0.0.
 
 - Remove the deprecated `ratelimithttp`, `ratelimitlog`, `ratelimitprincipal`,
   `ratelimitqueue` and `ratelimittelemetry` packages. Import the matching
-  `adapters/*` package. The removal precedes the announced support window;
+  `adapters/*` package. The HTTP and queue adapters require a
+  `*ratelimit.StrictService` and return a `*Middleware` whose `Wrap` reports an
+  error; `ratelimittelemetry.NewStrict` becomes `ratelimitotel.New`; move the
+  `go-migrations` import to `/v4`. The removal precedes the announced support window;
   published v2 releases keep the packages and no further v2 releases are
   planned.
 

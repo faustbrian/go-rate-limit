@@ -46,6 +46,7 @@ Configuration accepts at most 64 trusted prefixes. The forwarded chain selected
 by `http.Header.Get` is limited to 4,096 bytes and 32 hops; repeated field lines
 retain the released first-value behavior.
 
-Version 3 removed the former `ratelimithttp` package; use `adapters/http`.
+Version 3 removed the former `github.com/faustbrian/go-rate-limit/v2/ratelimithttp`
+package; use `adapters/http`, whose package is also named `ratelimithttp`.
 
 Continue with [Concepts and API](api.md).

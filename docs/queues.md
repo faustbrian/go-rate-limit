@@ -40,4 +40,5 @@ contract permits.
 Rate limiting is not job uniqueness, scheduler overlap, idempotency, or a
 general lock. Use the owning packages for those semantics.
 
-Version 3 removed the former `ratelimitqueue` package; use `adapters/queue`.
+Version 3 removed the former `github.com/faustbrian/go-rate-limit/v2/ratelimitqueue`
+package; use `adapters/queue`, whose package is also named `ratelimitqueue`.
