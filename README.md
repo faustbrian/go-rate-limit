@@ -16,7 +16,7 @@ PostgreSQL backends.
 
 The module lifecycle is **active** and its API maturity is **stable**. Go
 1.27.0 remains the minimum supported Go version. CI uses the patched Go
-1.27.2 runtime; applications should use the latest supported Go security patch.
+1.27.3 runtime; applications should use the latest supported Go security patch.
 The module path is `github.com/faustbrian/go-rate-limit/v3`. The PostgreSQL
 `GoMigration` adapter returns a `go-migrations/v4` migration with an unchanged
 checksum; runners moving from go-migrations v2 must first complete the

@@ -63,7 +63,8 @@ versioning after v1.0.0.
 
 ### Security
 
-- Run CI with Go 1.27.2 to include standard-library security fixes while
+- Run CI with Go 1.27.2, later raised to 1.27.3 in this release, to include
+  standard-library security fixes while
   retaining Go 1.27.0 as the module minimum. Keep the reusable workflow and
   source-built tooling pinned to the same compiler-compatible revision.
 

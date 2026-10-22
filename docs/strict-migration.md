@@ -37,7 +37,10 @@ Version 3 removed the legacy paths; the v2 line keeps them for their announced
 interval. Successors own their named Go types, so reflection identity and type
 assertions change at migration. The OTel instrumentation scope follows the
 module major and is now `github.com/faustbrian/go-rate-limit/v3/adapters/otel`;
-update dashboards and views that select an earlier scope. The PostgreSQL
+update dashboards and views that select an earlier scope. `adapters/otel` also
+records the `rate_limit.error.kind` attribute, which `ratelimittelemetry` did
+not, so series split by error kind; update attribute allowlists and
+exact-series queries. The PostgreSQL
 `GoMigration` returns a `go-migrations/v4` migration with the same checksum;
 complete the [ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade) before the first v4 run.
 
@@ -138,11 +141,13 @@ promise strict unknown-outcome classification. These are compatibility
 surfaces, not strict guarantees. Version 3 removed the legacy handler-wrapper,
 principal, logging, queue and telemetry packages.
 
-Within v3, roll back callers by restoring `NewService`; no persisted schema
-downgrade is required. Do not run v2 binaries after the go-migrations
+Within v3, callers of the root service and `ratelimitrpc` can roll back by
+restoring `NewService`; no persisted schema downgrade is required. The HTTP and
+queue adapters accept only `*ratelimit.StrictService` and have no non-strict
+path in v3; reverting them means returning to v2. Do not run v2 binaries after the go-migrations
 [ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade): they read the previous ledger table. The
-upgrade has no documented rollback: returning to v2 requires stopping every v3
-runner and restoring the previous ledger table name with its rows, constraints,
+upgrade has no documented rollback: returning to v2 requires stopping every
+go-migrations v4 runner and restoring the previous ledger table name with its rows, constraints,
 indexes and grants before any v2 binary runs. Do not interpret the rollback as reconciliation
 of an unknown mutation. Resolve each unknown PostgreSQL or Valkey operation
 before retrying or reverting behavior.
