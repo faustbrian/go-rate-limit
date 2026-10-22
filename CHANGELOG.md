@@ -46,6 +46,12 @@ versioning after v1.0.0.
   retaining Go 1.27.0 as the module minimum. Keep the reusable workflow and
   source-built tooling pinned to the same compiler-compatible revision.
 
+## 2.1.0 - 2026-10-22
+
+### Changed
+
+- Publish the current source and documentation with a fresh immutable tag.
+
 ## 2.0.0 - 2026-09-28
 
 ### Changed

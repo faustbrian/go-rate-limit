@@ -320,7 +320,7 @@
           "release": "not-started"
         }
       },
-      "version": "2.0.0",
+      "version": "2.1.0",
       "tag_prefix": "v",
       "owned_dependencies": [
         "github.com/faustbrian/go-migrations/v2"
