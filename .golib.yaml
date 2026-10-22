@@ -30,12 +30,7 @@ api:
         - ./adapters/otel
         - ./memory
         - ./postgres
-        - ./ratelimithttp
-        - ./ratelimitlog
-        - ./ratelimitprincipal
-        - ./ratelimitqueue
         - ./ratelimitrpc
-        - ./ratelimittelemetry
         - ./ratelimittest
         - ./valkey
 
@@ -75,11 +70,6 @@ operations:
       - type: go-test
         packages: [./postgres]
         fuzz: '^FuzzDecodeStateNeverPanics$'
-        budget: 100x
-        timeout: 2m
-      - type: go-test
-        packages: [./ratelimithttp]
-        fuzz: '^FuzzTrustedProxyChainNeverPanics$'
         budget: 100x
         timeout: 2m
       - type: go-test

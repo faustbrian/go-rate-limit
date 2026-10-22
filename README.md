@@ -4,7 +4,7 @@
 [![CodeQL](https://img.shields.io/badge/CodeQL-required-blue)](https://github.com/faustbrian/go-rate-limit/actions/workflows/ci.yml)
 [![Mutation](https://img.shields.io/badge/mutation-local_and_scheduled-blue)](CONTRIBUTING.md#verification)
 [![Documentation](https://img.shields.io/badge/docs-structural_checks_in_CI-blue)](docs/)
-[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit/v2.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit/v2)
+[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-rate-limit/v3.svg)](https://pkg.go.dev/github.com/faustbrian/go-rate-limit/v3)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-rate-limit?sort=semver)](https://github.com/faustbrian/go-rate-limit/releases)
 [![Go](https://img.shields.io/badge/go-1.27.0-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -17,9 +17,10 @@ PostgreSQL backends.
 The module lifecycle is **active** and its API maturity is **stable**. Go
 1.27.0 remains the minimum supported Go version. CI uses the patched Go
 1.27.2 runtime; applications should use the latest supported Go security patch.
-The published v2 module path is `github.com/faustbrian/go-rate-limit/v2`.
-Callers of the PostgreSQL `GoMigration` adapter must use it with the
-matching `go-migrations/v2` major version.
+The module path is `github.com/faustbrian/go-rate-limit/v3`. The PostgreSQL
+`GoMigration` adapter returns a `go-migrations/v4` migration with an unchanged
+checksum; runners moving from go-migrations v2 must first complete the
+[ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade).
 
 This library owns inbound request, RPC, queue-admission, and application
 operation limits. It does not own authorization, billing quotas, WAF rules,
@@ -85,8 +86,6 @@ from NOSCRIPT through valkey-go, and state has a bounded TTL.
   remains the supported JSON-RPC integration.
 - adapters/authentication: strict authentication-compatible principal adapter.
 - adapters/slog and adapters/otel: bounded slog and OpenTelemetry observations.
-- The ratelimithttp, ratelimitlog, ratelimitprincipal, ratelimitqueue, and
-  ratelimittelemetry paths remain available during the compatibility interval.
 - ratelimittest: deterministic clocks, reference models, and conformance.
 
 ## Documentation

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 )
 
 // Message contains caller-owned queue admission metadata, not a durable

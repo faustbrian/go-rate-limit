@@ -4,8 +4,8 @@ package ratelimitauthentication_test
 import (
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
-	ratelimitauthentication "github.com/faustbrian/go-rate-limit/v2/adapters/authentication"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
+	ratelimitauthentication "github.com/faustbrian/go-rate-limit/v3/adapters/authentication"
 )
 
 func TestPublicAPIExists(t *testing.T) {

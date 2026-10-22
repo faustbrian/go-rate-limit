@@ -1,5 +1,3 @@
-//nolint:staticcheck // Characterize both supported telemetry scopes.
-//lint:file-ignore SA1019 Compatibility characterization includes the legacy adapter.
 package ratelimit_test
 
 import (
@@ -8,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
-	ratelimitotel "github.com/faustbrian/go-rate-limit/v2/adapters/otel"
-	legacytelemetry "github.com/faustbrian/go-rate-limit/v2/ratelimittelemetry"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
+	ratelimitotel "github.com/faustbrian/go-rate-limit/v3/adapters/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -22,11 +19,8 @@ func TestOTelFilteredViewsPreserveAggregation(t *testing.T) {
 		scope     string
 		construct func(metric.MeterProvider) (ratelimit.Observer, error)
 	}{
-		{"github.com/faustbrian/go-rate-limit/v2/adapters/otel", func(provider metric.MeterProvider) (ratelimit.Observer, error) {
+		{"github.com/faustbrian/go-rate-limit/v3/adapters/otel", func(provider metric.MeterProvider) (ratelimit.Observer, error) {
 			return ratelimitotel.New(ratelimitotel.Options{MeterProvider: provider})
-		}},
-		{"github.com/faustbrian/go-rate-limit/v2/ratelimittelemetry", func(provider metric.MeterProvider) (ratelimit.Observer, error) {
-			return legacytelemetry.New(legacytelemetry.Options{MeterProvider: provider})
 		}},
 	} {
 		for _, view := range []struct {

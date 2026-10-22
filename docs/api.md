@@ -89,4 +89,4 @@ HMAC in a custom key derivation when guessing is a concern.
 
 The authoritative exported declarations are available through:
 
-    go doc -all github.com/faustbrian/go-rate-limit/v2
+    go doc -all github.com/faustbrian/go-rate-limit/v3

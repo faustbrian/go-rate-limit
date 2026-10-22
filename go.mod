@@ -1,9 +1,9 @@
-module github.com/faustbrian/go-rate-limit/v2
+module github.com/faustbrian/go-rate-limit/v3
 
 go 1.27.0
 
 require (
-	github.com/faustbrian/go-migrations/v2 v2.0.0
+	github.com/faustbrian/go-migrations/v4 v4.0.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/valkey-io/valkey-go v1.0.76
 	go.opentelemetry.io/otel v1.46.0
@@ -22,7 +22,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/sdk v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )

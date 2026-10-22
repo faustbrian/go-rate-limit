@@ -3,7 +3,23 @@
 All notable changes follow Keep a Changelog. The project uses semantic
 versioning after v1.0.0.
 
-## Unreleased
+## 3.0.0 - 2026-10-22
+
+### Changed
+
+- Move the module to `github.com/faustbrian/go-rate-limit/v3` and adopt
+  `go-migrations/v4`; `postgres.GoMigration` returns a v4 migration with the
+  same checksum. The OpenTelemetry scope follows the module path:
+  `github.com/faustbrian/go-rate-limit/v3/adapters/otel`.
+
+### Removed
+
+- Remove the deprecated `ratelimithttp`, `ratelimitlog`, `ratelimitprincipal`,
+  `ratelimitqueue` and `ratelimittelemetry` packages. Import the matching
+  `adapters/*` package. The removal precedes the announced support window,
+  which the v2 line continues to honour.
+
+## Earlier unversioned notes
 
 ### Added
 

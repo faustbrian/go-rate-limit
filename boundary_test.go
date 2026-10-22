@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 )
 
 const maxExactInteger = 9_007_199_254_740_991

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 	valkeygo "github.com/valkey-io/valkey-go"
 )
 

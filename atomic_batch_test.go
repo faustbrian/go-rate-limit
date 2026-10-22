@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 )
 
 // Plan: one explicit backend owns all-or-nothing capacity and original-command

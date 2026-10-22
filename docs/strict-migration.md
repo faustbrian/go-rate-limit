@@ -2,32 +2,30 @@
 
 [Documentation index](README.md)
 
-The public v2.0.0 release is available. Install and version the root module;
-current source may select newer dependencies than that immutable release.
-The successor adapters are packages in
-`github.com/faustbrian/go-rate-limit/v2`; they have no independent module, tag,
+The current major is v3. The adapters are packages in
+`github.com/faustbrian/go-rate-limit/v3`; they have no independent module, tag,
 or release version.
 
 ```sh
-go get github.com/faustbrian/go-rate-limit/v2@latest
+go get github.com/faustbrian/go-rate-limit/v3@latest
 ```
 
 Import the root API and selected successor packages from that same module:
 
 ```go
 import (
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
-	ratelimitauthentication "github.com/faustbrian/go-rate-limit/v2/adapters/authentication"
-	ratelimithttp "github.com/faustbrian/go-rate-limit/v2/adapters/http"
-	ratelimitotel "github.com/faustbrian/go-rate-limit/v2/adapters/otel"
-	ratelimitqueue "github.com/faustbrian/go-rate-limit/v2/adapters/queue"
-	ratelimitslog "github.com/faustbrian/go-rate-limit/v2/adapters/slog"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
+	ratelimitauthentication "github.com/faustbrian/go-rate-limit/v3/adapters/authentication"
+	ratelimithttp "github.com/faustbrian/go-rate-limit/v3/adapters/http"
+	ratelimitotel "github.com/faustbrian/go-rate-limit/v3/adapters/otel"
+	ratelimitqueue "github.com/faustbrian/go-rate-limit/v3/adapters/queue"
+	ratelimitslog "github.com/faustbrian/go-rate-limit/v3/adapters/slog"
 )
 ```
 
 ## Package paths
 
-| Supported legacy path | Successor path |
+| Removed path | Successor path |
 | --- | --- |
 | `ratelimithttp` | `adapters/http` |
 | `ratelimitlog` | `adapters/slog` |
@@ -35,16 +33,13 @@ import (
 | `ratelimitqueue` | `adapters/queue` |
 | `ratelimittelemetry` | `adapters/otel` |
 
-The legacy paths remain supported through the documented compatibility
-interval. Successors own their named Go types rather than aliasing legacy
-types, so reflection identity and type assertions change at migration. The
-OTel successor changes instrumentation scope from
-`github.com/faustbrian/go-rate-limit/adapters/otel` to
-`github.com/faustbrian/go-rate-limit/v2/adapters/otel`. The supported
-`ratelimittelemetry` adapter also changes scope from
-`github.com/faustbrian/go-rate-limit/ratelimittelemetry` to
-`github.com/faustbrian/go-rate-limit/v2/ratelimittelemetry`. Update dashboards
-and views that select either former scope.
+Version 3 removed the legacy paths; the v2 line keeps them for their announced
+interval. Successors own their named Go types, so reflection identity and type
+assertions change at migration. The OTel instrumentation scope follows the
+module major and is now `github.com/faustbrian/go-rate-limit/v3/adapters/otel`;
+update dashboards and views that select an earlier scope. The PostgreSQL
+`GoMigration` returns a `go-migrations/v4` migration with the same checksum;
+complete the [ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade) before the first v4 run.
 
 `ratelimitrpc` remains supported and is not deprecated. A JSON-RPC successor
 and its protocol/type redesign are deferred. `memory` also keeps its current

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
-	"github.com/faustbrian/go-rate-limit/v2/postgres"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
+	"github.com/faustbrian/go-rate-limit/v3/postgres"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"

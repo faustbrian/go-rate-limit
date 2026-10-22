@@ -3,8 +3,8 @@ package ratelimittest_test
 import (
 	"testing"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
-	"github.com/faustbrian/go-rate-limit/v2/ratelimittest"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
+	"github.com/faustbrian/go-rate-limit/v3/ratelimittest"
 )
 
 func TestStrictPublicAPIExists(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
-	ratelimithttp "github.com/faustbrian/go-rate-limit/v2/adapters/http"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
+	ratelimithttp "github.com/faustbrian/go-rate-limit/v3/adapters/http"
 )
 
 func TestPublicAPIExists(t *testing.T) {

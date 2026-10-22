@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 )
 
 // AdmitStrict uses context-interruptible shard locking and rechecks cancellation

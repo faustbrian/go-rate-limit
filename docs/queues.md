@@ -2,7 +2,7 @@
 
 [Documentation index](README.md)
 
-New callers use `github.com/faustbrian/go-rate-limit/v2/adapters/queue`. Construct
+New callers use `github.com/faustbrian/go-rate-limit/v3/adapters/queue`. Construct
 middleware with a `*ratelimit.StrictService`, then validate the downstream
 handler with the checked `Wrap` method:
 
@@ -40,7 +40,4 @@ contract permits.
 Rate limiting is not job uniqueness, scheduler overlap, idempotency, or a
 general lock. Use the owning packages for those semantics.
 
-The legacy `github.com/faustbrian/go-rate-limit/v2/ratelimitqueue` package remains
-supported through the compatibility interval. Its wrapper shape cannot report
-a nil or typed-nil downstream handler during wrapping; use the successor for
-new integrations.
+Version 3 removed the former `ratelimitqueue` package; use `adapters/queue`.

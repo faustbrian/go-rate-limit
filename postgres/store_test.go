@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	migrations "github.com/faustbrian/go-migrations/v2"
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	migrations "github.com/faustbrian/go-migrations/v4"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -179,4 +179,20 @@ func containsAll(value string, fragments ...string) bool {
 		}
 	}
 	return true
+}
+
+// Deployed ledgers recorded this checksum through the published v2 module; a
+// changed version, name, mode or SQL would fail validation of their history.
+func TestGoMigrationChecksumMatchesPublishedV2(t *testing.T) {
+	t.Parallel()
+
+	const want = "sha256:226a909b16bd2b3d39f58901f4306a3186e5b125340dd72cc7cad70e4160fbd1"
+	migration, err := GoMigration()
+	if err != nil {
+		t.Fatalf("GoMigration() error = %v", err)
+	}
+	if migration.Version() != 1 || migration.Name() != "create_rate_limit_states" || migration.Checksum().String() != want {
+		t.Fatalf("GoMigration() = %d/%s/%s, want 1/create_rate_limit_states/%s",
+			migration.Version(), migration.Name(), migration.Checksum(), want)
+	}
 }

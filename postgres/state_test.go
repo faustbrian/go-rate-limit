@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	ratelimit "github.com/faustbrian/go-rate-limit/v2"
+	ratelimit "github.com/faustbrian/go-rate-limit/v3"
 )
 
 func TestMutateStatePreservesWeightedTokenArithmetic(t *testing.T) {
