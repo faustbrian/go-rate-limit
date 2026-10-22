@@ -40,7 +40,12 @@ module major and is now `github.com/faustbrian/go-rate-limit/v3/adapters/otel`;
 update dashboards and views that select an earlier scope. `adapters/otel` also
 records the `rate_limit.error.kind` attribute, which `ratelimittelemetry` did
 not, so series split by error kind; update attribute allowlists and
-exact-series queries. The PostgreSQL
+exact-series queries. `adapters/slog` reports `outcome_unknown`, `canceled`,
+`unsupported` and `invalid` as their own `error_kind` values, where
+`ratelimitlog` logged them as `internal`, and classifies a deadline before a
+rejection; update queries and alerts that match `error_kind="internal"`.
+`ratelimitauthentication.Key(nil)` fails with `ErrInvalidPolicy`, where
+`ratelimitprincipal.Key(nil)` failed with `ErrInvalidKey`. The PostgreSQL
 `GoMigration` returns a `go-migrations/v4` migration with the same checksum;
 complete the [ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade) before the first v4 run.
 

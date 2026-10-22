@@ -56,6 +56,11 @@ func TestKeySnapshotsSubjectOnceAndRejectsTypedNil(t *testing.T) {
 	if err != nil || changing.calls != 1 || key != want {
 		t.Fatalf("snapshot=%q want=%q calls=%d err=%v", key.String(), want.String(), changing.calls, err)
 	}
+	// The key is persisted by backends; this value was produced by the
+	// published v2.1.0 ratelimitprincipal.Key for the same subject.
+	if got := key.String(); got != "auth:v1:principal:08f2e2603ea896cedc4d93b801d4754590c765a67af97a04fad3a47f0e81c319" {
+		t.Fatalf("persisted key = %q", got)
+	}
 	empty := &principal{}
 	if _, err := ratelimitauthentication.Key(empty); !errors.Is(err, ratelimit.ErrInvalidKey) || empty.calls != 1 {
 		t.Fatalf("empty calls=%d err=%v", empty.calls, err)

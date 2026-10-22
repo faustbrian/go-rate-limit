@@ -438,6 +438,9 @@ func TestQueueHelpersAndTotals(t *testing.T) {
 	if _, err := byTenant(Message{Queue: "q"}); !errors.Is(err, ratelimit.ErrInvalidKey) {
 		t.Fatalf("tenant=%v", err)
 	}
+	if _, err := byTenant(Message{Tenant: "t"}); !errors.Is(err, ratelimit.ErrInvalidKey) {
+		t.Fatalf("empty queue=%v", err)
+	}
 	// Subject kinds and values feed persisted backend keys.
 	subject, err := byTenant(Message{Queue: "ab", Tenant: "c"})
 	if err != nil || subject != (ratelimit.Subject{Kind: "queue-tenant", Value: "2:abc"}) {

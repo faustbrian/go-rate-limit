@@ -73,6 +73,11 @@ operations:
         budget: 100x
         timeout: 2m
       - type: go-test
+        packages: [./postgres]
+        fuzz: '^FuzzDecodeAtomicReceiptNeverGrantsCorruptAdmission$'
+        budget: 100x
+        timeout: 2m
+      - type: go-test
         packages: [./adapters/http]
         fuzz: '^FuzzClientIPNeverPanics$'
         budget: 100x

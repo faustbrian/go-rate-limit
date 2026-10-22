@@ -3,8 +3,9 @@
 [Documentation index](README.md)
 
 Version 3 removed the legacy `ratelimithttp`, `ratelimitlog`,
-`ratelimitprincipal`, `ratelimitqueue` and `ratelimittelemetry` packages; the
-v2 line keeps them. The root `NewService` and direct backend methods remain
+`ratelimitprincipal`, `ratelimitqueue` and `ratelimittelemetry` packages
+before their announced support window ended. Published v2 releases keep them;
+no further v2 releases are planned. The root `NewService` and direct backend methods remain
 beside the strict APIs.
 
 The remaining known residuals are:

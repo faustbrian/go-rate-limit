@@ -13,13 +13,19 @@ versioning after v1.0.0.
   [ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade) before the first v4
   run. The OpenTelemetry scope follows the module path:
   `github.com/faustbrian/go-rate-limit/v3/adapters/otel`.
+- `adapters/otel` adds the `rate_limit.error.kind` attribute, and
+  `adapters/slog` reports `outcome_unknown`, `canceled`, `unsupported` and
+  `invalid` as distinct `error_kind` values that `ratelimitlog` logged as
+  `internal`. A nil principal now fails with `ErrInvalidPolicy` rather than
+  `ErrInvalidKey`.
 
 ### Removed
 
 - Remove the deprecated `ratelimithttp`, `ratelimitlog`, `ratelimitprincipal`,
   `ratelimitqueue` and `ratelimittelemetry` packages. Import the matching
   `adapters/*` package. The removal precedes the announced support window;
-  the v2 line keeps the packages.
+  published v2 releases keep the packages and no further v2 releases are
+  planned.
 
 ## 2.1.0 - 2026-10-22
 
