@@ -64,7 +64,7 @@ No specification decisions or official conformance corpus are configured.
 | JSON-RPC | Ordered rule consumption not transactionality, shallow ID/result ownership, caller-verified identity, synchronous borrowed handlers and generic admission responses. |
 | ratelimittest | Mutex-backed mutable clock and unbounded rational reference map, shared sliding-window design, fresh-fixture/cleanup ownership and 64-worker joined tests without independent call deadlines; selected characterization is not general conformance. |
 
-All 71 test files were inventoried by scenario and read at their relevant contract
+All test files at the audited base were inventoried by scenario and read at their relevant contract
 assertions: core validation/outcome matrices, observer/callback lifecycle,
 compatibility identity, context-lock cancellation, strict temporal/state and
 revision boundaries, rollback ownership, native protocol replies and corruption,

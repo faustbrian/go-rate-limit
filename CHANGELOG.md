@@ -18,25 +18,16 @@ versioning after v1.0.0.
 
 - Remove the deprecated `ratelimithttp`, `ratelimitlog`, `ratelimitprincipal`,
   `ratelimitqueue` and `ratelimittelemetry` packages. Import the matching
-  `adapters/*` package. The removal precedes the announced support window,
-  which the v2 line continues to honour.
+  `adapters/*` package. The removal precedes the announced support window;
+  the v2 line keeps the packages.
 
-## Unreleased notes shipped by 2.1.0
-
-### Added
-
-- Add opt-in memory `RejectOnCapacity` for bounded emergency admission that
-  denies new keys instead of evicting consumed counters. Existing counters
-  remain usable; callers explicitly own safe idle reclamation through `Sweep`.
-  Default eviction behavior is unchanged.
-
-- Add explicit strict atomic multi-bucket token admission with original-command
-  replay. PostgreSQL migration 2 retains terminal success and rejection receipts;
-  apply it after the existing schema migration before selecting this backend.
-  Unknown outcomes require the same command and intent, never a new debit ID.
-  Existing per-item batches, memory and Valkey backends remain unchanged.
+## 2.1.0 - 2026-10-22
 
 ### Changed
+
+- Publish the current source and documentation with a fresh immutable tag.
+- Build with Go 1.27.3 to address GO-2026-6809 in `crypto/x509`.
+  Consumers should use Go 1.27.3 or newer.
 
 - Retain PostgreSQL token state through its full burst refill horizon, including
   compatibility writers and backwards client clock observations, so cleanup
@@ -57,20 +48,24 @@ versioning after v1.0.0.
   timestamptz scans use the client or configured scan location without
   changing the represented instant.
 
+### Added
+
+- Add opt-in memory `RejectOnCapacity` for bounded emergency admission that
+  denies new keys instead of evicting consumed counters. Existing counters
+  remain usable; callers explicitly own safe idle reclamation through `Sweep`.
+  Default eviction behavior is unchanged.
+
+- Add explicit strict atomic multi-bucket token admission with original-command
+  replay. PostgreSQL migration 2 retains terminal success and rejection receipts;
+  apply it after the existing schema migration before selecting this backend.
+  Unknown outcomes require the same command and intent, never a new debit ID.
+  Existing per-item batches, memory and Valkey backends remain unchanged.
 
 ### Security
 
 - Run CI with Go 1.27.2 to include standard-library security fixes while
   retaining Go 1.27.0 as the module minimum. Keep the reusable workflow and
   source-built tooling pinned to the same compiler-compatible revision.
-
-## 2.1.0 - 2026-10-22
-
-### Changed
-
-- Publish the current source and documentation with a fresh immutable tag.
-- Build with Go 1.27.3 to address GO-2026-6809 in `crypto/x509`.
-  Consumers should use Go 1.27.3 or newer.
 
 ## 2.0.0 - 2026-09-28
 

@@ -110,8 +110,8 @@ successful lease expiry must be later than it and equal the decision reset.
 ## Construction and ownership
 
 Strict APIs reject typed-nil required interfaces before invocation. The
-principal strict helpers snapshot `Subject` once. OTel strict constructors
-reject a typed-nil provider. Successor HTTP and queue middleware expose
+authentication adapter's `ratelimitauthentication.Key` snapshots `Subject`
+once, and `ratelimitotel.New` rejects a typed-nil provider. The HTTP and queue middleware expose
 checked `Wrap` methods that reject nil and typed-nil handlers before calling
 them. Optional callbacks retain their documented defaults.
 
@@ -140,8 +140,10 @@ principal, logging, queue and telemetry packages.
 
 Within v3, roll back callers by restoring `NewService`; no persisted schema
 downgrade is required. Do not run v2 binaries after the go-migrations
-[ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade): they read the previous ledger table. Follow
-that procedure's rollback steps before returning to v2. Do not interpret the rollback as reconciliation
+[ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade): they read the previous ledger table. The
+upgrade has no documented rollback: returning to v2 requires stopping every v3
+runner and restoring the previous ledger table name with its rows, constraints,
+indexes and grants before any v2 binary runs. Do not interpret the rollback as reconciliation
 of an unknown mutation. Resolve each unknown PostgreSQL or Valkey operation
 before retrying or reverting behavior.
 
