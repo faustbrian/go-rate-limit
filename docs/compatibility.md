@@ -2,11 +2,10 @@
 
 [Documentation index](README.md)
 
-The strict APIs and successor adapters are additive. The legacy packages stay
-supported for the longer of 180 days after the replacements are publicly
-consumable or two published stable minor releases containing both old and new
-paths. Removal requires a separately reviewed major-version decision and
-consumer evidence.
+Version 3 removed the legacy `ratelimithttp`, `ratelimitlog`,
+`ratelimitprincipal`, `ratelimitqueue` and `ratelimittelemetry` packages; the
+v2 line keeps them. The root `NewService` and direct backend methods remain
+beside the strict APIs.
 
 The remaining known residuals are:
 
@@ -17,7 +16,7 @@ The remaining known residuals are:
    remain outside this module and unchanged.
 5. Public searches cannot prove that no external consumers exist.
 6. Phase 4 resilience-stack composition ordering is deferred.
-7. Legacy typed-nil, cancellation, batch continuation, handler-wrapping, and
+7. Legacy root-service typed-nil, cancellation, batch continuation and
    cancellation-text behavior remains supported and characterized.
 8. Direct legacy backend methods do not classify post-dispatch unknown
    outcomes under the strict contract.
@@ -27,9 +26,10 @@ The remaining known residuals are:
     potentially unbounded disclosure, and direct/joined traversal remain
     beside the bounded `DoStrict` behavior and are not changed here.
 
-The v2 module retains the legacy adapter packages while changing the public
-`postgres.GoMigration` return type to `go-migrations/v2.Migration`. Callers
-must update rate-limit and migrations import paths together. No
+The v3 module returns a `go-migrations/v4.Migration` from
+`postgres.GoMigration` with the checksum v2 recorded. Callers must update
+rate-limit and migrations import paths together and complete the
+[ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade) before the first v4 run. No
 `adapters/jsonrpc` package, nested module, or independent successor tag is
 part of this release.
 

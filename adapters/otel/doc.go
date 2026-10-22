@@ -1,5 +1,5 @@
 // Package ratelimitotel records bounded rate-limit metrics with OpenTelemetry at
-// github.com/faustbrian/go-rate-limit/v2/adapters/otel.
+// github.com/faustbrian/go-rate-limit/v3/adapters/otel.
 //
 // Instrument creation and recording are synchronous; no exporter, global
 // provider or shutdown is owned. Direct observations can contain arbitrary labels

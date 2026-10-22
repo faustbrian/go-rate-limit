@@ -438,12 +438,17 @@ func TestQueueHelpersAndTotals(t *testing.T) {
 	if _, err := byTenant(Message{Queue: "q"}); !errors.Is(err, ratelimit.ErrInvalidKey) {
 		t.Fatalf("tenant=%v", err)
 	}
+	// Subject kinds and values feed persisted backend keys.
 	subject, err := byTenant(Message{Queue: "ab", Tenant: "c"})
-	if err != nil || subject.Value != "2:abc" {
+	if err != nil || subject != (ratelimit.Subject{Kind: "queue-tenant", Value: "2:abc"}) {
 		t.Fatalf("subject=%+v,%v", subject, err)
 	}
 	if _, err := ByPrincipal()(Message{}); !errors.Is(err, ratelimit.ErrInvalidKey) {
 		t.Fatalf("principal=%v", err)
+	}
+	if subject, err := ByPrincipal()(Message{Principal: "user-1"}); err != nil ||
+		subject != (ratelimit.Subject{Kind: "principal", Value: "user-1"}) {
+		t.Fatalf("principal subject=%+v,%v", subject, err)
 	}
 	var function HandlerFunc
 	if err := function.Handle(context.Background(), Message{}); !errors.Is(err, ratelimit.ErrInvalidPolicy) {

@@ -662,7 +662,7 @@ type Subject struct {
 package ratelimithttp // import "github.com/faustbrian/go-rate-limit/v3/adapters/http"
 
 Package ratelimithttp provides strict inbound HTTP rate-limit middleware at
-github.com/faustbrian/go-rate-limit/v2/adapters/http.
+github.com/faustbrian/go-rate-limit/v3/adapters/http.
 
 The middleware is synchronous and borrows callbacks, service and handler.
 Callbacks may block or panic and must support concurrent requests. Proxy trust
@@ -741,7 +741,7 @@ type Options struct {
 package ratelimitslog // import "github.com/faustbrian/go-rate-limit/v3/adapters/slog"
 
 Package ratelimitslog records bounded rate-limit observations with slog at
-github.com/faustbrian/go-rate-limit/v2/adapters/slog.
+github.com/faustbrian/go-rate-limit/v3/adapters/slog.
 
 The logger is borrowed and calls are synchronous with context.Background.
 Direct observation labels require caller validation; only error classification
@@ -776,7 +776,7 @@ type Options struct {
 package ratelimitauthentication // import "github.com/faustbrian/go-rate-limit/v3/adapters/authentication"
 
 Package ratelimitauthentication derives strict rate-limit keys at
-github.com/faustbrian/go-rate-limit/v2/adapters/authentication.
+github.com/faustbrian/go-rate-limit/v3/adapters/authentication.
 
 Key snapshots Subject once after nil validation. It does not perform
 authentication, establish tenant membership or prevent guesses of low-entropy
@@ -803,7 +803,7 @@ type Principal interface {
 package ratelimitqueue // import "github.com/faustbrian/go-rate-limit/v3/adapters/queue"
 
 Package ratelimitqueue provides strict queue admission middleware at
-github.com/faustbrian/go-rate-limit/v2/adapters/queue.
+github.com/faustbrian/go-rate-limit/v3/adapters/queue.
 
 Deferral is a signal, not scheduling or acknowledgement. Callbacks run
 synchronously in Subject/Cost/Now order and the downstream handler runs only
@@ -897,7 +897,7 @@ func ByQueueAndTenant() SubjectFunc
 package ratelimitotel // import "github.com/faustbrian/go-rate-limit/v3/adapters/otel"
 
 Package ratelimitotel records bounded rate-limit metrics with OpenTelemetry at
-github.com/faustbrian/go-rate-limit/v2/adapters/otel.
+github.com/faustbrian/go-rate-limit/v3/adapters/otel.
 
 Instrument creation and recording are synchronous; no exporter, global provider
 or shutdown is owned. Direct observations can contain arbitrary labels and are
@@ -1044,7 +1044,7 @@ const (
 FUNCTIONS
 
 func GoMigration() (migrations.Migration, error)
-    GoMigration adapts the hand-maintained SchemaMigration to migrations/v2
+    GoMigration adapts the hand-maintained SchemaMigration to migrations/v4
     with default transaction mode. It does not apply SQL or open a connection;
     the application owns migration installation and destructive Down use.
 

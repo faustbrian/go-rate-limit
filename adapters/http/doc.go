@@ -1,5 +1,5 @@
 // Package ratelimithttp provides strict inbound HTTP rate-limit middleware at
-// github.com/faustbrian/go-rate-limit/v2/adapters/http.
+// github.com/faustbrian/go-rate-limit/v3/adapters/http.
 //
 // The middleware is synchronous and borrows callbacks, service and handler.
 // Callbacks may block or panic and must support concurrent requests. Proxy trust

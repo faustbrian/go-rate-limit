@@ -131,16 +131,17 @@ are defined in [API contracts](api.md#callback-concurrency-and-ownership).
 
 ## Compatibility and rollback
 
-Legacy constructors, services, backend methods, handler wrappers, batch
-continuation, cancellation-to-deadline classification, fail-open decisions,
-observer fields, and typed-nil behavior remain unchanged. In particular,
-legacy handler wrappers cannot report nil handlers, legacy principal success
-calls `Subject` twice, legacy telemetry/principal typed nil may panic, and
-direct legacy backend methods cannot promise strict unknown-outcome
-classification. These are compatibility surfaces, not strict guarantees.
+Legacy root constructors, services, backend methods, batch continuation,
+cancellation-to-deadline classification, fail-open decisions, observer fields,
+and typed-nil behavior remain unchanged. Direct legacy backend methods cannot
+promise strict unknown-outcome classification. These are compatibility
+surfaces, not strict guarantees. Version 3 removed the legacy handler-wrapper,
+principal, logging, queue and telemetry packages.
 
-Roll back callers by restoring legacy imports and `NewService`; no persisted
-schema downgrade is required. Do not interpret the rollback as reconciliation
+Within v3, roll back callers by restoring `NewService`; no persisted schema
+downgrade is required. Do not run v2 binaries after the go-migrations
+[ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade): they read the previous ledger table. Follow
+that procedure's rollback steps before returning to v2. Do not interpret the rollback as reconciliation
 of an unknown mutation. Resolve each unknown PostgreSQL or Valkey operation
 before retrying or reverting behavior.
 

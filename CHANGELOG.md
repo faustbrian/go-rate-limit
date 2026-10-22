@@ -9,7 +9,9 @@ versioning after v1.0.0.
 
 - Move the module to `github.com/faustbrian/go-rate-limit/v3` and adopt
   `go-migrations/v4`; `postgres.GoMigration` returns a v4 migration with the
-  same checksum. The OpenTelemetry scope follows the module path:
+  same checksum; complete the go-migrations
+  [ledger name upgrade](https://github.com/faustbrian/go-migrations/blob/v4.0.0/docs/operations.md#ledger-name-upgrade) before the first v4
+  run. The OpenTelemetry scope follows the module path:
   `github.com/faustbrian/go-rate-limit/v3/adapters/otel`.
 
 ### Removed
@@ -19,7 +21,7 @@ versioning after v1.0.0.
   `adapters/*` package. The removal precedes the announced support window,
   which the v2 line continues to honour.
 
-## Earlier unversioned notes
+## Unreleased notes shipped by 2.1.0
 
 ### Added
 

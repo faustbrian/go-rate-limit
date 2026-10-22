@@ -31,7 +31,7 @@ CREATE INDEX rate_limit_states_expires_at_idx
 	}
 }
 
-// GoMigration adapts the hand-maintained SchemaMigration to migrations/v2
+// GoMigration adapts the hand-maintained SchemaMigration to migrations/v4
 // with default transaction mode. It does not apply SQL or open a connection;
 // the application owns migration installation and destructive Down use.
 func GoMigration() (migrations.Migration, error) {

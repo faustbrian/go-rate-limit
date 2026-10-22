@@ -1,5 +1,5 @@
 // Package ratelimitqueue provides strict queue admission middleware at
-// github.com/faustbrian/go-rate-limit/v2/adapters/queue.
+// github.com/faustbrian/go-rate-limit/v3/adapters/queue.
 //
 // Deferral is a signal, not scheduling or acknowledgement. Callbacks run
 // synchronously in Subject/Cost/Now order and the downstream handler runs only

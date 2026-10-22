@@ -61,17 +61,16 @@ No specification decisions or official conformance corpus are configured.
 | valkey | Borrowed native client, startup Valkey/noeviction observation, one slot/key and separate strict script identities, server-selected effective time, post-dispatch ambiguity, saturated TTL and script limits; atomic Lua execution is not rollback on script error. |
 | Canonical authentication/HTTP/queue | Nil/typed-nil checks, once-per-call ordered callbacks, caller identity/proxy trust, bounded selected key not every message string, no acknowledgement/retries, handler/context lifetime and propagated operational panics. |
 | Canonical slog/OpenTelemetry | Synchronous background-context sink calls, borrowed logger/instruments, zero/nil no-op observers, provider panics not contained, direct labels unvalidated and no export/shutdown ownership. |
-| Five deprecated packages | Deprecation markers preserved; legacy principal reads Subject twice, unchecked handler/receiver behavior and distinct telemetry scope/attributes retained. Strict helpers reject typed nil but do not recover collaborator panics. |
 | JSON-RPC | Ordered rule consumption not transactionality, shallow ID/result ownership, caller-verified identity, synchronous borrowed handlers and generic admission responses. |
 | ratelimittest | Mutex-backed mutable clock and unbounded rational reference map, shared sliding-window design, fresh-fixture/cleanup ownership and 64-worker joined tests without independent call deadlines; selected characterization is not general conformance. |
 
-All 79 test files were inventoried by scenario and read at their relevant contract
+All 71 test files were inventoried by scenario and read at their relevant contract
 assertions: core validation/outcome matrices, observer/callback lifecycle,
 compatibility identity, context-lock cancellation, strict temporal/state and
 revision boundaries, rollback ownership, native protocol replies and corruption,
 telemetry view/collection compatibility, and optional backend integration. Five
-fuzz targets cover key construction, two proxy paths, PostgreSQL decoding and
-Valkey replies. Three benchmarks cover batch sizes, hot keys and cardinality.
+fuzz targets cover key construction, one proxy path, two PostgreSQL decoders
+and Valkey replies. Three benchmarks cover batch sizes, hot keys and cardinality.
 One output-bearing root Example exercises the strict memory admission path.
 These existing tests inform prose; unchanged broad campaigns are not rerun.
 
