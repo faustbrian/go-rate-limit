@@ -3,7 +3,7 @@
 All notable changes follow Keep a Changelog. The project uses semantic
 versioning after v1.0.0.
 
-## 3.0.0 - 2026-10-22
+## 3.0.0 - 2026-10-23
 
 ### Changed
 
